@@ -46,9 +46,13 @@ Follow the steps below to set up the server details in IQmol.
 
    **1. Connection:** Select **SSH** as the connection method.
 
-   **2. Name:** Enter a recognizable server name, such as `Ganymede2`.
+   **2. Name:** Enter a recognizable server name, such as `ganymede2`.
 
-   **3. Host Address:** Enter `ganymede2.circ.utdallas.edu`.
+   **3. Host Address:** Enter 
+
+        ```
+        ganymede2.circ.utdallas.edu
+        ``` 
 
    **4. Authentication:** Choose the appropriate method:
 
@@ -108,10 +112,16 @@ Follow the steps below to set up the server details in IQmol.
 
    - **The Known Hosts File path:**
 
-     - **For Linux/macOS:**
+     - **For Linux:**
 
        ```
        /home/your_local_username/.ssh/known_hosts
+       ```
+
+     - **For macOS:**
+
+       ```
+       /Users/your_local_username/.ssh/known_hosts
        ```
 
      - **For Windows:**
@@ -130,10 +140,16 @@ Follow the steps below to set up the server details in IQmol.
 
        - Set the **Private Key File** to your private key, e.g.,
 
-         - For Linux/macOS:
+         - For Linux:
 
            ```
            /home/your_local_username/.ssh/id_ed25519
+           ```
+
+         - For macOS:
+
+           ```
+           /Users/your_local_username/.ssh/id_ed25519
            ```
 
          - For Windows:
@@ -144,10 +160,16 @@ Follow the steps below to set up the server details in IQmol.
 
        - Set the **Public Key File** to your public key, e.g.,
 
-         - For Linux/macOS:
+         - For Linux:
 
            ```
            /home/your_local_username/.ssh/id_ed25519.pub
+           ```
+
+         - For macOS:
+
+           ```
+           /Users/your_local_username/.ssh/id_ed25519.pub
            ```
 
          - For Windows:
