@@ -50,9 +50,9 @@ Follow the steps below to set up the server details in IQmol.
 
    **3. Host Address:** Enter
 
-        ```
-        ganymede2.circ.utdallas.edu
-        ```
+     ```
+     ganymede2.circ.utdallas.edu
+     ```
 
    **4. Authentication:** Choose the appropriate method:
 
