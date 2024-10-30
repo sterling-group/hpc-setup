@@ -48,11 +48,11 @@ Follow the steps below to set up the server details in IQmol.
 
    **2. Name:** Enter a recognizable server name, such as `ganymede2`.
 
-   **3. Host Address:** Enter 
+   **3. Host Address:** Enter
 
         ```
         ganymede2.circ.utdallas.edu
-        ``` 
+        ```
 
    **4. Authentication:** Choose the appropriate method:
 
