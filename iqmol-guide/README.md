@@ -78,7 +78,6 @@ Follow the steps below to set up the server details in IQmol.
      ```
      #!/bin/bash
      #SBATCH --partition=${QUEUE}
-     #SBATCH --exclude=compute-2-07-[01-11]
      #SBATCH --time=${WALLTIME}
      #SBATCH --nodes=1
      #SBATCH --cpus-per-task=${NCPUS}
@@ -203,7 +202,7 @@ Follow the steps below to set up the server details in IQmol.
 
 4. **The following steps may need to be done if prompted:**
 
-   - Upon submission, a prompt may appear to add the server to known hosts. Click **OK**.
+   - Upon submission, a prompt may appear to add the Host to the known hosts file. Click **YES**.
    - If using password authentication, enter your **NetID password** when prompted.
 
 5. **Choose a Folder Name for your job files.** **Note:** Do not use spaces in the folder name.
