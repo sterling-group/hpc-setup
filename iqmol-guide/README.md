@@ -209,14 +209,14 @@ Follow the steps below to set up the server details in IQmol.
 
 6. **Configure the job settings:**
 
-   - **Partition:**
+   - **Queue:**
 
-     - If you are enrolled, select the `sterling` partition.
-     - If you are auditing, choose `normal`.
+     - If you are enrolled, select the `6v39` partition.
 
-   - **Number of Threads:** Select the number of CPUs you wish to use.
+   - **Wall Time:** Set the maximum time for your job. Ensure that you allocate enough time, but do not exceed 48 hours.
 
-   - **Maximum Time:** Set the maximum time for your job.
+   - **CPUs:** Select the number of CPUs you wish to use. Do not exceed 16 CPUs per job.
+
 
      ![Configuring Job Resources](images/iqmol_job_resources.png)  
      *Figure 7: Configuring Job Resources*
@@ -225,5 +225,6 @@ Follow the steps below to set up the server details in IQmol.
 
 ## Conclusion
 
-You have successfully configured IQmol to connect to the server and submitted a job. Remember to monitor your jobs on the server. If you encounter any issues, refer to the troubleshooting section or contact your system administrator.
+You have successfully configured IQmol to connect to the server and submitted a job.
+Remember to monitor your jobs on the server. If you encounter any issues, contact your system administrator for assistance.
 
