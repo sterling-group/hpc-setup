@@ -215,7 +215,7 @@ Follow the steps below to set up the server details in IQmol.
 
    - **Wall Time:** Set the maximum time for your job. Ensure that you allocate enough time, but do not exceed 48 hours.
 
-   - **CPUs:** Select the number of CPUs you wish to use. Do not exceed 16 CPUs per job.
+   - **CPUs:** Select the number of CPUs you wish to use. Do not exceed 8 CPUs per job.
 
 
      ![Configuring Job Resources](images/iqmol_job_resources.png)  
