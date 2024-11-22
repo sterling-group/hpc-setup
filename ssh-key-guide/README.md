@@ -132,7 +132,7 @@ An SSH agent holds your private keys in memory, allowing you to use them without
    Get-Service ssh-agent | Set-Service -StartupType Automatic -PassThru | Start-Service
    ```
 
-2. **Add your private key to the SSH agent:**
+2. **Add your private key to the SSH agent. Run the following commands again in the Command Prompt:**
 
    ```
    ssh-add %USERPROFILE%\.ssh\id_ed25519
