@@ -105,7 +105,7 @@ An SSH agent holds your private keys in memory, allowing you to use them without
 1. **Start the SSH agent:**
 
    ```
-   ssh-agent
+   eval "$(ssh-agent -s)"
    ```
 
 2. **Add your private key to the SSH agent:**
