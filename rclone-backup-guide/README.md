@@ -70,7 +70,7 @@ rclone authorize "box" "xxxxxxxxxxxxxxxx"
 3. When asked:
    ```text
    Keep this "box" remote?
-y) Yes
+   y) y
    ```
 4. Verify:
    ```bash
