@@ -1,0 +1,233 @@
+\documentclass[12pt,letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{caption}
+\captionsetup{
+    font=small,
+    labelfont=bf,
+    textfont=md,
+    format=hang,
+    justification=centering,
+    textformat=period,
+}
+\usepackage{float}
+\usepackage{geometry}
+\usepackage{microtype}
+\usepackage[breaklinks=true,hidelinks]{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{amsmath}
+\usepackage{cleveref}
+\usepackage{textcomp}
+ \newcommand{\mytexttilde}{\raisebox{0.5ex}{\texttildelow}}
+% Set page margins
+% \geometry{
+%     a4paper,
+%     left=25mm,
+%     right=25mm,
+%     top=25mm,
+%     bottom=25mm,
+% }
+
+% Define custom style for listings
+\lstdefinestyle{custombash}{
+    language=bash,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+}
+
+\title{\LARGE Rclone Backup to Box for Cluster}
+\author{Markus G. S. Weiss}
+\date{2025/04/23}
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+This tutorial explains how to configure \texttt{rclone} on your cluster to back up \texttt{/mfs/io/groups/sterling/mfshome/\$USER} to a Box directory named \texttt{cluster-backup}, with subfolders for \texttt{daily}, \texttt{archive}, and \texttt{logs}, and how to schedule it via cron. Users in the sterling group only need to run the commands in sections 2, 3, 4, and 6. The scripts are maintained centrally under \texttt{/mfs/io/groups/sterling/setup}.
+
+\section{Prerequisites}
+
+\begin{itemize}
+  \item rclone (v1.38 or later) installed on both the cluster and your desktop (with a browser)
+  \item Confirm rclone versions match:
+    \begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone version
+rclone version
+    \end{lstlisting}
+  \item A Box Enterprise SSO account
+  \item Shell access to the cluster with cron available
+  \item \textbf{Tip:} Before running any live syncs, test with \texttt{--dry-run}:
+    \begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone sync \
+  /mfs/io/groups/sterling/mfshome/$USER box:cluster-backup/daily \
+  --dry-run --fast-list --checksum
+    \end{lstlisting}
+\end{itemize}
+
+\section{Configure the Box Remote with Offline Authorization}
+
+Run the rclone config command on the cluster:
+\begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone config
+\end{lstlisting}
+
+Press \textbf{Enter} to accept each default (shown in \texttt{<>}):
+\begin{lstlisting}[style=custombash]
+No remotes found, make a new one? n
+name> box
+Storage> box
+client_id> <leave blank>
+client_secret> <leave blank>
+box_config_file> <leave blank>
+access_token> <leave blank>
+box_sub_type> 2
+Edit advanced config? n
+Use web browser to authenticate? n
+\end{lstlisting}
+
+rclone will then print a command:
+\begin{lstlisting}[style=custombash]
+rclone authorize "box" "xxxxxxxxxxxxxxxx"
+\end{lstlisting}
+
+\begin{enumerate}
+  \item Copy that exact command to your local machine and run it; complete the OAuth flow in your browser.
+  \item rclone prints a long token string; back on the cluster, paste it at:
+    \begin{lstlisting}[style=custombash]
+config_token> xxxxxxxxxxxxxxxx
+    \end{lstlisting}
+  \item When asked, confirm: \texttt{y}
+  \item Verify:
+    \begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:
+    \end{lstlisting}
+\end{enumerate}
+
+\section{Create the Box Folder Hierarchy}
+
+On the cluster, run:
+\begin{lstlisting}[style=custombash]
+# Parent folder
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup
+# Subfolders
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/daily
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/archive
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/logs
+\end{lstlisting}
+
+Verify:
+\begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:cluster-backup
+\end{lstlisting}
+
+\section{Prepare the Local Environment}
+
+Create a local logs directory:
+\begin{lstlisting}[style=custombash]
+mkdir -p ~/logs
+\end{lstlisting}
+
+\section{Reference Scripts}
+
+Scripts are in \texttt{/mfs/io/groups/sterling/setup}.
+
+\subsection{backup.sh}
+\begin{lstlisting}[style=custombash]
+#!/usr/bin/env bash
+set -euo pipefail
+
+data_dir="/mfs/io/groups/sterling/mfshome/$USER"
+remote_root="box:cluster-backup"
+rclone_bin="/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone"
+date_str=$(date +%F)
+
+# 1) Daily incremental
+"$rclone_bin" sync "$data_dir" "${remote_root}/daily" --fast-list --checksum --log-file "$HOME/logs/backup-$date_str.log" --log-level INFO
+
+# 2) Weekly snapshot (Sundays)
+if [[ "$(date +%u)" == "7" ]]; then
+  "$rclone_bin" sync "$data_dir" "${remote_root}/archive/$date_str" --fast-list --checksum --log-file "$HOME/logs/snapshot-$date_str.log" --log-level INFO
+fi
+
+# 3) Upload logs
+"$rclone_bin" sync "$HOME/logs" "${remote_root}/logs" --fast-list --log-level INFO
+\end{lstlisting}
+
+\subsection{cronscript}
+\begin{lstlisting}[style=custombash]
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=$USER@utdallas.edu
+TZ=Europe/Berlin
+
+# Run backup.sh daily at 02:00
+0 2 * * * /mfs/io/groups/sterling/setup/backup.sh
+
+# Rotate old snapshots (keep 4 weeks)
+0 3 1 * * /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone delete --min-age 28d box:cluster-backup/archive
+\end{lstlisting}
+
+\section{Install the Cron Job}
+
+Install via:
+\begin{lstlisting}[style=custombash]
+crontab /mfs/io/groups/sterling/setup/cronscript
+crontab -l
+\end{lstlisting}
+
+\section{Monitoring \& Maintenance}
+
+\begin{itemize}
+  \item View logs: \lstinline!tail -f ~/logs/backup-$(date +%F).log!
+  \item Clean local logs older than 30 days:
+    \begin{lstlisting}[style=custombash]
+find ~/logs -type f -mtime +30 -delete
+    \end{lstlisting}
+  \item Test restore:
+    \begin{lstlisting}[style=custombash]
+/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy box:cluster-backup/daily/path/to/file /tmp && diff /tmp/file /mfs/io/groups/sterling/mfshome/$USER/path/to/file
+    \end{lstlisting}
+  \item Alerts: Cron emails stderr/stdout. For advanced alerting, grep logs for ERROR or integrate with Slack.
+\end{itemize}
+
+\section{Additional Notes}
+
+\begin{itemize}
+  \item Security: Keep \texttt{~/.config/rclone/rclone.conf} private. Use a \texttt{crypt} wrapper for encryption.
+  \item API rate limits (side note): Adjust \texttt{--transfers}, \texttt{--checkers}, or add \texttt{--tpslimit} if you encounter errors.
+  \item Network/firewall (side note): Ensure outbound HTTPS (443). If behind a proxy, set \texttt{HTTPS\_PROXY} or use \texttt{--proxy}.
+  \item Monthly snapshots: Extend logic with \lstinline!if [ "$(date +%d)" == "01" ]!.
+  \item Upstream docs: \url{https://rclone.org/box/}
+\end{itemize}
+
+\section{Conclusion}
+
+In this tutorial, you have:
+\begin{itemize}
+  \item Configured offline SSO authorization on a headless cluster
+  \item Created an organized Box folder hierarchy under \texttt{cluster-backup}
+  \item Prepared local logging and referenced centralized scripts
+  \item Automated daily syncs and weekly snapshots via \texttt{backup.sh} and cron
+  \item Established monitoring, restore procedures, and cleanup routines
+  \item Included best-practice notes on dry-runs, version checks, security, API limits, and network requirements
+\end{itemize}
+
+\vspace{1em}
+\noindent\textbf{Great work!} Your cluster home directory is now automatically and safely backed up to Box every night, with versioning, logs, and tools for easy maintenance and recovery.
+
+\end{document}
+

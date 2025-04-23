@@ -193,7 +193,7 @@ crontab -l
 - **Test restores:**  
   ```bash
   /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy \  
-    box:cluster-backup/daily/path/to/file /tmp && diff …
+    box:cluster-backup/daily/path/to/file /tmp && diff /tmp/file /mfs/io/groups/sterling/mfshome/$USER/path/to/file
   ```
 - **Error notifications:** Cron will email stderr/stdout to `$USER@yourdomain.com`. For advanced alerting, you can grep logs for `ERROR` and pipe to mail or integrate with Slack.
 
