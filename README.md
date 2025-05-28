@@ -33,4 +33,3 @@ Contributions are welcome! If you have suggestions for improving these guides or
 ## License
 
 This project is licensed under the [LICENSE](LICENSE) specified in this repository.
-
