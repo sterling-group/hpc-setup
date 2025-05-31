@@ -381,4 +381,3 @@ In this tutorial, you have:
 
 Great work! Your cluster’s home directory is now automatically and safely backed up to Box every night, with versioning, logs, and the tools for easy maintenance and recovery.
 
-
