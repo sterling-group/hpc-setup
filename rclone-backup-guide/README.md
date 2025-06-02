@@ -25,10 +25,9 @@
 
 ---
 
----
 ## Introduction
+
 This tutorial explains how to configure `rclone` on your cluster to back up `/mfs/io/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/mfs/io/groups/sterling/setup`.
----
 
 ## Prerequisites
 
