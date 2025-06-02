@@ -176,7 +176,7 @@ DATE_STR=$(date +%F)
 LOCK_FILE="$HOME/.backup_${USER}.lock"
 
 # Common rclone options
-RCLONE_OPTS="--dry-run --fast-list --checksum --log-level WARNING"
+RCLONE_OPTS="--fast-list --checksum --log-level WARNING"
 
 # Retry settings
 MAX_RETRIES=3
