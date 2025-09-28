@@ -9,7 +9,6 @@
 #   - Conda environment management with a custom 'activate' function
 #
 # Compatibility:
-#   - Mostly POSIX-compatible
 #   - Designed for Bash/Zsh (Bourne-compatible shells)
 #   - Uses 'alias', which is supported in Bash/Zsh but not strictly POSIX
 #
@@ -17,11 +16,11 @@
 #   1. Source this script in your ~/.bashrc or ~/.zshrc:
 #        [ -f "/path/to/sterling_env.sh" ] && . "/path/to/sterling_env.sh"
 #   2. Use the `activate` function to manage Conda environments:
-#        activate            # Lists environments (excluding 'base') and activates 'creator'
-#        activate myenv      # Activates 'myenv' if it exists; otherwise, activates 'creator'
+#        activate            # Lists environments (excluding 'base')
+#        activate myenv      # Activates 'myenv' if it exists
 #
 # Author:  Markus G. S. Weiss
-# Date:    2025-01-15
+# Date:    2025-09-16
 ###############################################################################
 
 ###############################################################################
@@ -44,7 +43,7 @@ if [ -z "${CLUSTER_NAME:-}" ]; then
 fi
 
 # Define cluster-specific paths
-G2_STERLING_GROUP="/mfs/io/groups/sterling"
+G2_STERLING_GROUP="/groups/sterling"
 JUNO_STERLING_GROUP="/groups/sterling"
 STERLING_GROUP=""
 CONDA_ROOT=""
@@ -65,7 +64,7 @@ esac
 #    (Adds cluster-specific scripts to PATH and defines aliases)
 ###############################################################################
 if [ -n "$STERLING_GROUP" ] && [ -d "$STERLING_GROUP" ]; then
-  USER_BHOME="$STERLING_GROUP/mfshome/$USER"
+  USER_MFSHOME="$STERLING_GROUP/mfshome/$USER"
 
   # Add Sterling scripts to PATH if present
   if [ -d "$STERLING_GROUP/scripts" ]; then
@@ -73,10 +72,10 @@ if [ -n "$STERLING_GROUP" ] && [ -d "$STERLING_GROUP" ]; then
   fi  
 
   # Alias to navigate to HPC home directory, if it exists
-  if [ -d "$USER_BHOME" ]; then
-    alias cdh="cd '$USER_BHOME'"
+  if [ -d "$USER_MFSHOME" ]; then
+    alias cdh="cd '$USER_MFSHOME'"
     # Uncomment the following line to automatically navigate to HPC home on login:
-    # cd "$USER_BHOME" >/dev/null 2>&1
+    cd "$USER_MFSHOME" >/dev/null 2>&1
   fi  
 
   # Additional HPC-specific aliases
@@ -111,92 +110,128 @@ cl() {
 # 5. Conda Environment Management
 #    (Defines the `activate` function for managing Conda environments)
 ###############################################################################
-# Variables to track Conda initialization and cached environments
+# Universal Conda Environment Management
+# - Fast environment detection: Direct filesystem checks instead of `conda env list`
+# - Source conda.sh once: Only when activate is first called, then flag is set
+# - Minimal functions: activate
+
+# Color Definitions (for conda activate function)
+COLOR_RESET='\033[0m'
+COLOR_RED='\033[1;31m'
+COLOR_GREEN='\033[1;32m'
+COLOR_YELLOW='\033[1;33m'
+COLOR_BLUE='\033[1;34m'
+
+# Conda Environment Management (Universal)
+
+# Flag to track if conda has been initialized
 CONDA_INIT_DONE=""
-CACHED_CONDA_ENVS=""
 
-# Update the cached list of Conda environments, excluding 'base' and 'creator'
-conda_update_cache() {
-  CACHED_CONDA_ENVS="$(
-    conda env list 2>/dev/null \
-      | awk '$1 != "base" && $1 != "creator" && $1 !~ /^#/ && NF > 0 {print $1}'
-  )"
+# Fast conda environment detection - replicates `conda env list` without calling conda
+conda_fast_env_list() {
+    local root="$CONDA_ROOT"
+    local registry="$HOME/.conda/environments.txt"
+    local envs=()
+    
+    # Collect all prefixes into an array
+    
+    # 1) Per-user registry
+    if [ -f "$registry" ]; then
+        while IFS= read -r p; do
+            [ -n "$p" ] && [ -d "$p/conda-meta" ] && envs+=("$p")
+        done < "$registry"
+    fi
+    
+    # 2) Default envs_dirs under root and under ~/.conda/envs
+    for ed in "$root/envs" "$HOME/.conda/envs"; do
+        if [ -d "$ed" ]; then
+            for d in "$ed"/*; do
+                [ -d "$d/conda-meta" ] && envs+=("$d")
+            done
+        fi
+    done
+    
+    # 3) Include the base/root env itself
+    [ -d "$root/conda-meta" ] && envs+=("$root")
+    
+    # De-duplicate & sort
+    local uniq_envs
+    mapfile -t uniq_envs < <(printf "%s\n" "${envs[@]}" | sort -u)
+    
+    # Extract names and print in conda env list format
+    for prefix in "${uniq_envs[@]}"; do
+        local name
+        if [ "$prefix" = "$root" ]; then
+            name="base"
+        elif [[ "$prefix" == "$root/envs/"* ]]; then
+            name="${prefix##*/}"
+        elif [[ "$prefix" == "$HOME/.conda/envs/"* ]]; then
+            name="${prefix##*/}"
+        else
+            name="$prefix"
+        fi
+        printf "%s %s\n" "$name" "$prefix"
+    done
 }
 
-# List cached Conda environments with 'creator' appended at the end
-conda_list_cached_envs_with_creator() {
-  printf "%bExisting environments (excluding 'base'):%b\n" \
-    "$COLOR_YELLOW" "$COLOR_RESET"
-
-  # Print all cached environments
-  echo "$CACHED_CONDA_ENVS" | while IFS= read -r env; do
-    [ -n "$env" ] && printf "  - %s\n" "$env"
-  done
-
-  # Always list 'creator' last
-  printf "  - creator\n"
-}
-
-# The `activate` function
+# The `activate` function - simple and lean
 activate() {
-  # Do nothing if the shell is not interactive
-  [ -z "${PS1:-}" ] && return 0
+    # Do nothing if the shell is not interactive
+    [ -z "${PS1:-}" ] && return 0
 
-  # Lazy-load Conda by sourcing conda.sh only once
-  if [ -z "$CONDA_INIT_DONE" ]; then
-    if [ -n "$CONDA_ROOT" ] && [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
-      # shellcheck disable=SC1091
-      . "$CONDA_ROOT/etc/profile.d/conda.sh"
-      CONDA_INIT_DONE="yes"
-      conda_update_cache
+    # Check if CONDA_ROOT is set (should be set by cluster configs)
+    if [ -z "$CONDA_ROOT" ]; then
+        printf "%bError:%b CONDA_ROOT not set. Check your cluster configuration.\n" \
+            "$COLOR_RED" "$COLOR_RESET" 1>&2
+        return 1
+    fi
+
+    # Source conda.sh only once
+    if [ -z "$CONDA_INIT_DONE" ]; then
+        if [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
+            # shellcheck disable=SC1091
+            . "$CONDA_ROOT/etc/profile.d/conda.sh"
+            CONDA_INIT_DONE="yes"
+        else
+            printf "%bError:%b Cannot find Conda at %s/etc/profile.d/conda.sh\n" \
+                "$COLOR_RED" "$COLOR_RESET" "$CONDA_ROOT" 1>&2
+            return 1
+        fi
+    fi
+
+    local env_arg="$1"
+
+    # Case 1: No argument provided - print environments (name and path) like `conda env list`
+    if [ -z "$env_arg" ]; then
+        echo "# conda environments:"
+        echo
+        # Use the fast lister to print name and path, aligned
+        conda_fast_env_list | awk '$1 != "base" {printf "  %-20s %s\n", $1, $2}'
+        return 0
+    fi
+
+    # Case 2: Only activate valid envs; never activate base
+    if [ "$env_arg" = "base" ]; then
+        printf "%bRefusing to activate 'base'.%b Use 'activate creator' or create a new env:\n" \
+            "$COLOR_YELLOW" "$COLOR_RESET"
+        printf "  conda create -n <name> python=3.11\n"
+        return 1
+    fi
+
+    if conda_fast_env_list | awk '{print $1}' | grep -qx "$env_arg"; then
+        printf "%bActivating environment:%b %b%s%b\n" \
+            "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
+        conda activate "$env_arg"
     else
-      printf "%bError:%b Cannot find Conda at %s\n" \
-        "$COLOR_RED" "$COLOR_RESET" "$CONDA_ROOT" 1>&2
-      return 1
+        printf "%bEnvironment '%s' not found.%b\n" \
+            "$COLOR_RED" "$env_arg" "$COLOR_RESET"
+        printf "Create it with:\n  conda create -n %s python=3.11\n" "$env_arg"
+        return 1
     fi
-  fi
-
-  env_arg="$1"
-
-  # Case 1: No argument provided
-  if [ -z "$env_arg" ]; then
-    conda_list_cached_envs_with_creator
-    printf "\n%bNo environment specified. Defaulting to 'creator'.%b\n" \
-      "$COLOR_BLUE" "$COLOR_RESET"
-    env_arg="creator"
-  fi
-
-  # Case 2: If the user specified 'creator', skip the cache check
-  if [ "$env_arg" != "creator" ]; then
-    # Check if the specified environment exists in the cached list
-    echo "$CACHED_CONDA_ENVS" | grep -qx "$env_arg"
-    if [ $? -ne 0 ]; then
-      # Environment not found; update cache and recheck
-      conda_update_cache
-      echo "$CACHED_CONDA_ENVS" | grep -qx "$env_arg"
-      if [ $? -ne 0 ]; then
-        # Still not found; provide error and fallback to 'creator'
-        printf "%bError:%b Environment '%s' not found.\n" \
-          "$COLOR_RED" "$COLOR_RESET" "$env_arg" 1>&2
-        printf "You can create it with: %bconda create --name %s%b\n\n" \
-          "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
-
-        # List existing environments again
-        conda_list_cached_envs_with_creator
-        printf "\n%bDefaulting to 'creator'...%b\n" \
-          "$COLOR_YELLOW" "$COLOR_RESET"
-        env_arg="creator"
-      fi
-    fi
-  fi
-
-  # Attempt to activate the chosen environment
-  printf "%bActivating environment:%b %b%s%b\n" \
-    "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
-  conda activate "$env_arg"
-  return 0
 }
 
+# Export Functions
+export -f activate
 ###############################################################################
 # 6. Final Touches
 #    (Exports PATH and displays a startup message in interactive shells)
