@@ -1,0 +1,115 @@
+#!/bin/bash
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+G2_STERLING_GROUP="/mfs/io/groups/sterling"
+JUNO_STERLING_GROUP="/groups/sterling"
+if [ -d "$BHOME" ]; then
+#    cd $BHOME
+    alias cdh='cd $BHOME'
+fi
+
+# Path to the centralized environment script
+if [[ "$CLUSTER_NAME" == "g2" ]]; then
+    STERLING_GROUP="$G2_STERLING_GROUP"
+elif [[ "$CLUSTER_NAME" == "juno" ]]; then
+    STERLING_GROUP="$JUNO_STERLING_GROUP"
+else
+    echo "Unknown cluster name: $CLUSTER_NAME"
+    exit 1  # Optionally exit or handle this case as needed
+fi
+
+#export BHOME=/mfs/io/groups/sterling/mfshome/$USER
+
+
+# Export PATH variables
+export PATH="$STERLING_GROUP/scripts:$PATH"
+# Define useful aliases
+alias ll='ls -lh'
+alias la='ls -A'
+alias l='ls'
+alias activate="activate_environment"
+alias deactivate="conda deactivate"
+alias cdp="cd $STERLING_GROUP/scripts"
+mk() { mkdir -p "$1" && cd "$1"; }
+cl() { cd "$1" && ll; } # uses alias defined above
+alias md='function md_func() { mkdir -p "$1" && cd "$1"; }; md_func'
+alias cp='cp -i'
+alias sq='squeue -u $USER'
+alias sqa="$STERLING_GROUP/scripts/qsage3 -sjw"
+
+
+
+
+# Enhanced Bash function to activate a specified Conda environment, or 'creator' if no argument is passed
+activate_environment() {
+    # Source the conda.sh script once
+    source /mfs/io/groups/sterling/miniconda3/etc/profile.d/conda.sh
+
+    # Set the environment to activate; default to 'creator' if no argument is provided
+    local env="${1:-creator}"
+
+    # Define color codes for better readability
+    local COLOR_RESET="\033[0m"
+    local COLOR_BLUE="\033[1;34m"
+    local COLOR_GREEN="\033[1;32m"
+    local COLOR_YELLOW="\033[1;33m"
+    local COLOR_RED="\033[1;31m"
+
+    if [ -z "$1" ]; then
+        echo -e "${COLOR_YELLOW}No environment specified.${COLOR_RESET}"
+        echo -e "Use the following command to list existing environments:\n   ${COLOR_GREEN}conda env list${COLOR_RESET}"
+        echo -e "\n${COLOR_BLUE}Activating 'creator' environment!${COLOR_RESET}"
+        echo -e "Create your desired environment with:\n\n   ${COLOR_GREEN}conda create --name <env_name>${COLOR_RESET}\n"
+    else
+        # Check if the specified environment exists (excluding 'base' and comment lines)
+        if conda env list | grep -v '^#' | awk '{print $1}' | grep -qw "$env"; then
+            echo -e "${COLOR_BLUE}Activating environment:${COLOR_RESET} ${COLOR_GREEN}$env${COLOR_RESET}"
+        else
+            echo -e "${COLOR_RED}Error:${COLOR_RESET} Environment '${COLOR_GREEN}$env${COLOR_RESET}' does not exist."
+            echo -e "Create it using:\n   ${COLOR_GREEN}conda create --name $env${COLOR_RESET}"
+            echo -e "Or search for existing environments using:\n   ${COLOR_GREEN}conda env list${COLOR_RESET}\n"
+
+            # Automatically list existing environments excluding 'base' and comment lines
+            echo -e "${COLOR_YELLOW}Existing Conda Environments:${COLOR_RESET}"
+            conda env list | grep -v '^#' | awk '{print "  "$1}' | grep -v '^  base$'
+
+            # Interactive selection of existing environments
+            echo -e "\n${COLOR_YELLOW}Please select an environment to activate:${COLOR_RESET}"
+
+            # Gather existing environments into an array
+            IFS=$'\n' read -r -d '' -a env_list <<< "$(conda env list | grep -v '^#' | awk '{print $1}' | grep -v '^base$')"
+
+            if [ ${#env_list[@]} -eq 0 ]; then
+                echo -e "${COLOR_RED}No additional environments available to activate.${COLOR_RESET}"
+                return 1
+            fi
+
+            # Display the list with numbers, starting from 1
+            for idx in "${!env_list[@]}"; do
+                printf "  %d %s\n" "$((idx + 1))" "${env_list[$idx]}"
+            done
+            printf "  0 Cancel\n"
+
+            # Prompt user for selection
+            read -rp "Enter the number of the environment to activate: " selection
+
+            # Validate input
+            if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 0 ] && [ "$selection" -le $(( ${#env_list[@]} )) ]; then
+                if [ "$selection" -eq 0 ]; then
+                    echo -e "${COLOR_BLUE}Activation canceled.${COLOR_RESET}"
+                    return 1
+                else
+                    selected_env="${env_list[$((selection - 1 ))]}"
+                    echo -e "${COLOR_BLUE}Activating environment:${COLOR_RESET} ${COLOR_GREEN}$selected_env${COLOR_RESET}"
+                    conda activate "$selected_env"
+                fi
+            else
+                echo -e "${COLOR_RED}Invalid selection. Activation canceled.${COLOR_RESET}"
+                return 1
+            fi
+        fi
+    fi  
+
+    # Activate the specified environment (for default 'creator')
+    conda activate "$env"
+}
+
