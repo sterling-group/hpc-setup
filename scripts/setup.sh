@@ -1,8 +1,23 @@
-#!/bin/bash                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+#!/bin/sh
+#
+# This script sets up the HPC environment for Sterling group clusters.
+#
+# It creates the necessary home directory structure, detects the cluster type,
+# and configures shell initialization files to source the Sterling group
+# environment setup. Supports both adding and removing the configuration.
+#
+# Usage:
+#     setup.sh [options]
+#     
+# Options:
+#     --help      Display help message and exit
+#     --remove    Remove environment setup from shell configuration
+#
 # Author:
 #     Markus G. S. Weiss
 # Date:
-#     2025-01-15
+#     2025-09-27
+#
 
 CLUSTER_NAME=$(scontrol show config | grep -oP '^ClusterName\s*=\s*\K\S+' || echo 'unknown')
 
