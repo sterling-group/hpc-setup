@@ -1,0 +1,16 @@
+# ------------------------------------------------------------------------------
+# Crontab: sterling's backup jobs
+# Description:
+#   Runs the master backup.sh every day, with all pruning and log‐uploads
+#   handled internally in that script.
+#
+# Author: Markus G. S. Weiss
+# Date:   2025-05-05
+# ------------------------------------------------------------------------------
+
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+#MAILTO=$USER@utdallas.edu
+
+# Run backup.sh daily at 02:00
+0 2 * * * /mfs/io/groups/sterling/setup/backup.sh
