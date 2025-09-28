@@ -22,10 +22,10 @@
 CLUSTER_NAME=$(scontrol show config | grep -oP '^ClusterName\s*=\s*\K\S+' || echo 'unknown')
 
 # Define paths based on cluster name
-if [[ "$CLUSTER_NAME" == "g2" ]]; then
+if [ "$CLUSTER_NAME" = "g2" ]; then
     MFSHOME="/groups/sterling/mfshome/$USER"
     SETUP_SCRIPT="/groups/sterling/setup/environment"
-elif [[ "$CLUSTER_NAME" == "juno" ]]; then
+elif [ "$CLUSTER_NAME" = "juno" ]; then
     MFSHOME="/groups/sterling/mfshome/$USER"
     SETUP_SCRIPT="/groups/sterling/setup/environment"
 else
@@ -77,7 +77,7 @@ EOF
 }
 
 # Parse command-line arguments
-if [[ $# -gt 1 ]]; then
+if [ $# -gt 1 ]; then
     show_help
 fi
 
