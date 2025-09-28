@@ -8,10 +8,10 @@ CLUSTER_NAME=$(scontrol show config | grep -oP '^ClusterName\s*=\s*\K\S+' || ech
 
 # Define paths based on cluster name
 if [[ "$CLUSTER_NAME" == "g2" ]]; then
-    BHOME="/mfs/io/groups/sterling/mfshome/$USER"
-    SETUP_SCRIPT="/mfs/io/groups/sterling/setup/environment"
+    MFSHOME="/groups/sterling/mfshome/$USER"
+    SETUP_SCRIPT="/groups/sterling/setup/environment"
 elif [[ "$CLUSTER_NAME" == "juno" ]]; then
-    BHOME="/groups/sterling/mfshome/$USER"
+    MFSHOME="/groups/sterling/mfshome/$USER"
     SETUP_SCRIPT="/groups/sterling/setup/environment"
 else
     echo "Unknown cluster name: $CLUSTER_NAME"
@@ -19,13 +19,13 @@ else
 fi
 
 # Check if the directory exists
-if [ ! -d "$BHOME" ]; then
-    echo "Creating directory: $BHOME"
-    mkdir -p "$BHOME"
-    chmod 750 "$BHOME"
+if [ ! -d "$MFSHOME" ]; then
+    echo "Creating directory: $MFSHOME"
+    mkdir -p "$MFSHOME"
+    chmod 750 "$MFSHOME"
     echo "Directory created and permissions set to 750."
 else
-    echo "Your home directory already exists: $BHOME"
+    echo "Your home directory already exists: $MFSHOME"
 fi
 
 # Unique markers to identify the sourcing block
