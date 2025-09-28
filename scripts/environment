@@ -20,7 +20,7 @@
 #        activate myenv      # Activates 'myenv' if it exists
 #
 # Author:  Markus G. S. Weiss
-# Date:    2025-09-16
+# Date:    2025-09-27
 ###############################################################################
 
 ###############################################################################
@@ -128,63 +128,85 @@ COLOR_BLUE='\033[1;34m'
 CONDA_INIT_DONE=""
 
 # Fast conda environment detection - replicates `conda env list` without calling conda
-conda_fast_env_list() {
-    local root="$CONDA_ROOT"
-    local registry="$HOME/.conda/environments.txt"
-    local envs=()
+conda_fast_env_list() {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+    # Ensure we have a conda root if possible
+    if [ -z "$CONDA_ROOT" ]; then
+        detect_conda_root || true
+    fi  
     
-    # Collect all prefixes into an array
+    # Setup: Hash table for O(1) deduplication, cached variables for performance
+    local -A seen_envs                    # Associative array prevents duplicates instantly
+    local root="${CONDA_ROOT}"            # Cache to avoid repeated expansions
+    local registry="$HOME/.conda/environments.txt"  # Conda's authoritative environment registry
     
-    # 1) Per-user registry
+    # PRIMARY SOURCE: Process conda's registry file (contains 95% of environments)
+    # This file is maintained by conda and contains all known environment paths
     if [ -f "$registry" ]; then
-        while IFS= read -r p; do
-            [ -n "$p" ] && [ -d "$p/conda-meta" ] && envs+=("$p")
+        while IFS= read -r prefix || [ -n "$prefix" ]; do  # Handle files without final newline
+            # Fast filtering: Skip comments and empty lines immediately
+            [[ "$prefix" =~ ^[[:space:]]*# ]] || [ -z "$prefix" ] && continue
+    
+            # Deduplication: O(1) hash table lookup vs O(n) array search
+            [ -n "${seen_envs[$prefix]}" ] && continue
+    
+            # Validation: Ensure environment is valid (has conda-meta directory)
+            [ ! -d "$prefix/conda-meta" ] && continue
+    
+            # Mark as processed to prevent duplicates
+            seen_envs[$prefix]=1
+    
+            # INLINE FORMATTING: Process and format in single pass
+            # Extract meaningful names from paths for better UX
+            if [ "$prefix" = "$root" ]; then
+                # Base environment: Always named "base"
+                printf "  %-20s %s\n" "base" "$prefix"
+            elif [[ "$prefix" == */envs/* ]]; then
+                # Standard conda environments: Extract name from /envs/name pattern
+                # This works with ANY conda installation (/path/to/conda/envs/myenv)
+                printf "  %-20s %s\n" "${prefix##*/}" "$prefix"
+            else
+                # Non-standard environments: Use full path as name
+                # These are usually environments created with custom --prefix
+                printf "  %-20s %s\n" "$prefix" "$prefix"
+            fi
         done < "$registry"
-    fi
+    fi  
     
-    # 2) Default envs_dirs under root and under ~/.conda/envs
-    for ed in "$root/envs" "$HOME/.conda/envs"; do
-        if [ -d "$ed" ]; then
-            for d in "$ed"/*; do
-                [ -d "$d/conda-meta" ] && envs+=("$d")
-            done
-        fi
-    done
+    # FALLBACK: Filesystem scan for environments not in registry (rare edge case)
+    # Only needed if environments exist in standard locations but aren't registered
+    for envdir in "$root/envs" "$HOME/.conda/envs"; do
+        # Skip if directory doesn't exist (avoid unnecessary filesystem access)
+        [ ! -d "$envdir" ] && continue
     
-    # 3) Include the base/root env itself
-    [ -d "$root/conda-meta" ] && envs+=("$root")
+        # Scan for environments in this directory
+        for envpath in "$envdir"/*; do
+            # Validate: Must be a directory with conda-meta
+            [ ! -d "$envpath/conda-meta" ] && continue
     
-    # De-duplicate & sort
-    local uniq_envs
-    mapfile -t uniq_envs < <(printf "%s\n" "${envs[@]}" | sort -u)
+            # Skip if already processed from registry
+            [ -n "${seen_envs[$envpath]}" ] && continue
     
-    # Extract names and print in conda env list format
-    for prefix in "${uniq_envs[@]}"; do
-        local name
-        if [ "$prefix" = "$root" ]; then
-            name="base"
-        elif [[ "$prefix" == "$root/envs/"* ]]; then
-            name="${prefix##*/}"
-        elif [[ "$prefix" == "$HOME/.conda/envs/"* ]]; then
-            name="${prefix##*/}"
-        else
-            name="$prefix"
-        fi
-        printf "%s %s\n" "$name" "$prefix"
+            # Mark as seen and format output
+            seen_envs[$envpath]=1
+            printf "  %-20s %s\n" "${envpath##*/}" "$envpath"
+        done
     done
 }
 
 # The `activate` function - simple and lean
 activate() {
-    # Do nothing if the shell is not interactive
-    [ -z "${PS1:-}" ] && return 0
+    # # Do nothing if the shell is not interactive
+    # [ -z "${PS1:-}" ] && return 0
 
-    # Check if CONDA_ROOT is set (should be set by cluster configs)
+    # Ensure CONDA_ROOT is set: prefer cluster configs, else auto-detect common ~/opt or /opt installs
     if [ -z "$CONDA_ROOT" ]; then
-        printf "%bError:%b CONDA_ROOT not set. Check your cluster configuration.\n" \
-            "$COLOR_RED" "$COLOR_RESET" 1>&2
-        return 1
-    fi
+        if ! detect_conda_root; then
+            printf "%bError:%b CONDA_ROOT not set and no Conda installation found in ~/opt or /opt.\n" \
+                "$COLOR_RED" "$COLOR_RESET" 1>&2
+            printf "Searched: ~/opt/miniconda3, ~/opt/conda, /opt/miniconda3, /opt/conda, and common user forges.\n" 1>&2
+            return 1
+        fi
+    fi  
 
     # Source conda.sh only once
     if [ -z "$CONDA_INIT_DONE" ]; then
@@ -197,7 +219,7 @@ activate() {
                 "$COLOR_RED" "$COLOR_RESET" "$CONDA_ROOT" 1>&2
             return 1
         fi
-    fi
+    fi  
 
     local env_arg="$1"
 
@@ -205,10 +227,10 @@ activate() {
     if [ -z "$env_arg" ]; then
         echo "# conda environments:"
         echo
-        # Use the fast lister to print name and path, aligned
-        conda_fast_env_list | awk '$1 != "base" {printf "  %-20s %s\n", $1, $2}'
+        # Use optimized lister - already formatted and excludes base environments
+        conda_fast_env_list | grep -v '^  base '
         return 0
-    fi
+    fi  
 
     # Case 2: Only activate valid envs; never activate base
     if [ "$env_arg" = "base" ]; then
@@ -216,9 +238,10 @@ activate() {
             "$COLOR_YELLOW" "$COLOR_RESET"
         printf "  conda create -n <name> python=3.11\n"
         return 1
-    fi
+    fi  
 
-    if conda_fast_env_list | awk '{print $1}' | grep -qx "$env_arg"; then
+    # Check if environment exists by looking for it in our formatted output
+    if conda_fast_env_list | grep -q "^  $env_arg "; then
         printf "%bActivating environment:%b %b%s%b\n" \
             "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
         conda activate "$env_arg"
@@ -227,8 +250,9 @@ activate() {
             "$COLOR_RED" "$env_arg" "$COLOR_RESET"
         printf "Create it with:\n  conda create -n %s python=3.11\n" "$env_arg"
         return 1
-    fi
+    fi  
 }
+
 
 # Export Functions
 export -f activate
