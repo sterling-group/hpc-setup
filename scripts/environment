@@ -14,7 +14,7 @@
 #
 # Usage:
 #   1. Source this script in your ~/.bashrc or ~/.zshrc:
-#        [ -f "/path/to/sterling_env.sh" ] && . "/path/to/sterling_env.sh"
+#        [ -f "/path/to/environment" ] && . "/path/to/environment"
 #   2. Use the `activate` function to manage Conda environments:
 #        activate            # Lists environments (excluding 'base')
 #        activate myenv      # Activates 'myenv' if it exists
@@ -64,19 +64,19 @@ esac
 #    (Adds cluster-specific scripts to PATH and defines aliases)
 ###############################################################################
 if [ -n "$STERLING_GROUP" ] && [ -d "$STERLING_GROUP" ]; then
-  USER_MFSHOME="$STERLING_GROUP/mfshome/$USER"
+  MFSHOME="$STERLING_GROUP/mfshome/$USER"
 
   # Add Sterling scripts to PATH if present
   if [ -d "$STERLING_GROUP/scripts" ]; then
     PATH="$STERLING_GROUP/scripts:$PATH"
-  fi  
+  fi
 
   # Alias to navigate to HPC home directory, if it exists
-  if [ -d "$USER_MFSHOME" ]; then
-    alias cdh="cd '$USER_MFSHOME'"
-    # Uncomment the following line to automatically navigate to HPC home on login:
-    cd "$USER_MFSHOME" >/dev/null 2>&1
-  fi  
+if [ -d "$MFSHOME" ]; then
+    alias cdh="cd '$MFSHOME'"
+    # Automatically navigate to HPC home directory on login
+    cd "$MFSHOME" >/dev/null 2>&1
+  fi
 
   # Additional HPC-specific aliases
   alias cdp='cd "$STERLING_GROUP/scripts"'
