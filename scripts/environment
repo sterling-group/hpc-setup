@@ -1,18 +1,32 @@
 #!/usr/bin/env sh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
 ###############################################################################
-# Sterling Group Environment Setup (Mostly POSIX + Conda Caching)
+# Sterling Group Environment Setup
 # -----------------------------------------------------------------------------
-#  - Works in bash, zsh, dash, etc. (not csh!)
-#  - Sets up paths and aliases for G2 / Juno HPC clusters.
-#  - Lazy loads Conda upon the first use of "activate", then caches environment list.
-#  - Subsequent calls to "activate" do NOT re-source conda.sh or re-run `conda env list`.
+# This script sets up the environment for the Sterling Group HPC clusters.
+# It includes:
+#   - Cluster-specific paths and aliases
+#   - Common shell aliases and functions
+#   - Conda environment management with a custom 'activate' function
+#
+# Compatibility:
+#   - Mostly POSIX-compatible
+#   - Designed for Bash/Zsh (Bourne-compatible shells)
+#   - Uses 'alias', which is supported in Bash/Zsh but not strictly POSIX
+#
+# Usage:
+#   1. Source this script in your ~/.bashrc or ~/.zshrc:
+#        [ -f "/path/to/sterling_env.sh" ] && . "/path/to/sterling_env.sh"
+#   2. Use the `activate` function to manage Conda environments:
+#        activate            # Lists environments (excluding 'base') and activates 'creator'
+#        activate myenv      # Activates 'myenv' if it exists; otherwise, activates 'creator'
 #
 # Author:  Markus G. S. Weiss
 # Date:    2025-01-15
 ###############################################################################
 
 ###############################################################################
-# 1. Color Definitions (POSIX-Compatible)
+# 1. Color Definitions
+#    (Used for formatting output messages)
 ###############################################################################
 COLOR_RESET='\033[0m'
 COLOR_RED='\033[1;31m'
@@ -22,153 +36,179 @@ COLOR_BLUE='\033[1;34m'
 
 ###############################################################################
 # 2. HPC Cluster Detection
-#    (Expects CLUSTER_NAME to be set externally, e.g. "g2" or "juno".)
+#    (Sets paths based on the CLUSTER_NAME environment variable)
 ###############################################################################
 if [ -z "${CLUSTER_NAME:-}" ]; then
-  printf "%b[WARNING]%b CLUSTER_NAME is not set. Some paths may not be configured.\n" \
+  printf "%b[WARNING]%b CLUSTER_NAME not set. Some paths may not be configured.\n" \
     "$COLOR_YELLOW" "$COLOR_RESET"
 fi
 
+# Define cluster-specific paths
 G2_STERLING_GROUP="/mfs/io/groups/sterling"
 JUNO_STERLING_GROUP="/groups/sterling"
 STERLING_GROUP=""
 CONDA_ROOT=""
 
-if [ "$CLUSTER_NAME" = "g2" ]; then
-  STERLING_GROUP="$G2_STERLING_GROUP"
-  CONDA_ROOT="$G2_STERLING_GROUP/miniconda3"
-elif [ "$CLUSTER_NAME" = "juno" ]; then
-  STERLING_GROUP="$JUNO_STERLING_GROUP"
-  CONDA_ROOT="$JUNO_STERLING_GROUP/miniconda3"
-fi
+case "$CLUSTER_NAME" in
+  g2) 
+    STERLING_GROUP="$G2_STERLING_GROUP"
+    CONDA_ROOT="$G2_STERLING_GROUP/miniconda3"
+    ;;  
+  juno)
+    STERLING_GROUP="$JUNO_STERLING_GROUP"
+    CONDA_ROOT="$JUNO_STERLING_GROUP/miniconda3"
+    ;;  
+esac
 
 ###############################################################################
 # 3. HPC Environment Setup
+#    (Adds cluster-specific scripts to PATH and defines aliases)
 ###############################################################################
 if [ -n "$STERLING_GROUP" ] && [ -d "$STERLING_GROUP" ]; then
   USER_BHOME="$STERLING_GROUP/mfshome/$USER"
-  
-  # Add sterling scripts to PATH if present
+
+  # Add Sterling scripts to PATH if present
   if [ -d "$STERLING_GROUP/scripts" ]; then
     PATH="$STERLING_GROUP/scripts:$PATH"
   fi  
-  
-  # Define an alias to jump to BHOME if it exists
+
+  # Alias to navigate to HPC home directory, if it exists
   if [ -d "$USER_BHOME" ]; then
     alias cdh="cd '$USER_BHOME'"
-    # Uncomment next line if you want to *always* cd to BHOME at login:
+    # Uncomment the following line to automatically navigate to HPC home on login:
     # cd "$USER_BHOME" >/dev/null 2>&1
   fi  
-  
-  # Additional HPC aliases
-  alias cdp='cd "$STERLING_GROUP/scripts"'   # Jump to group scripts
-  alias sq='squeue -u "$USER"'               # Show own jobs in queue
-  alias sqa="$STERLING_GROUP/scripts/qsage3 -sjw"  # Example HPC command
+
+  # Additional HPC-specific aliases
+  alias cdp='cd "$STERLING_GROUP/scripts"'
+  alias sq='squeue -u "$USER"'
+  alias sqa="$STERLING_GROUP/scripts/qsage3 -sjw"
 fi
 
 ###############################################################################
 # 4. Common Aliases and Functions
+#    (General-purpose shell enhancements)
 ###############################################################################
+# File listing aliases
 alias ll='ls -lh'
 alias la='ls -A'
 alias l='ls'
-alias cp='cp -i'  # Interactive copy
 
-# Create-and-cd
+# Interactive copy
+alias cp='cp -i'
+
+# Directory helpers
 mk() {
   mkdir -p "$1" && cd "$1" || return 1
 }
 
-# cd-and-ls
 cl() {
   cd "$1" || return 1
   ls -lh 
 }
 
 ###############################################################################
-# 5. Conda Environment Management (Lazy Loading + Caching)
+# 5. Conda Environment Management
+#    (Defines the `activate` function for managing Conda environments)
 ###############################################################################
-# We keep two global variables:
-#   1) CONDA_INIT_DONE  = "yes" if conda.sh has been sourced
-#   2) CACHED_CONDA_ENVS = list of existing conda env names (one per line)
-#
-# This way, we:
-#   - Only source conda.sh the first time "activate" is called.
-#   - Only run `conda env list` once, caching the result for faster lookups.
-
+# Variables to track Conda initialization and cached environments
 CONDA_INIT_DONE=""
 CACHED_CONDA_ENVS=""
 
-# POSIX note: no arrays; store environment names in a single string separated by newlines.
+# Update the cached list of Conda environments, excluding 'base' and 'creator'
 conda_update_cache() {
-  # This updates CACHED_CONDA_ENVS with the environment names we find.
-  # We skip lines starting with '#' and blank lines. Adjust as you like.
-  CACHED_CONDA_ENVS="$(conda env list 2>/dev/null | grep -v '^#' | awk '{print $1}')"
+  CACHED_CONDA_ENVS="$(
+    conda env list 2>/dev/null \
+      | awk '$1 != "base" && $1 != "creator" && $1 !~ /^#/ && NF > 0 {print $1}'
+  )"
 }
 
+# List cached Conda environments with 'creator' appended at the end
+conda_list_cached_envs_with_creator() {
+  printf "%bExisting environments (excluding 'base'):%b\n" \
+    "$COLOR_YELLOW" "$COLOR_RESET"
+
+  # Print all cached environments
+  echo "$CACHED_CONDA_ENVS" | while IFS= read -r env; do
+    [ -n "$env" ] && printf "  - %s\n" "$env"
+  done
+
+  # Always list 'creator' last
+  printf "  - creator\n"
+}
+
+# The `activate` function
 activate() {
-  # If we're not interactive (no PS1), do nothing
+  # Do nothing if the shell is not interactive
   [ -z "${PS1:-}" ] && return 0
 
-  # Lazy source conda.sh once
+  # Lazy-load Conda by sourcing conda.sh only once
   if [ -z "$CONDA_INIT_DONE" ]; then
     if [ -n "$CONDA_ROOT" ] && [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
       # shellcheck disable=SC1091
       . "$CONDA_ROOT/etc/profile.d/conda.sh"
       CONDA_INIT_DONE="yes"
-      # Fetch environment list once
       conda_update_cache
     else
-      printf "%bError:%b Could not source Conda from %s\n" \
+      printf "%bError:%b Cannot find Conda at %s\n" \
         "$COLOR_RED" "$COLOR_RESET" "$CONDA_ROOT" 1>&2
       return 1
-    fi  
-  fi  
-
-  # Decide which environment to activate
-  envname="${1:-creator}"  # default to 'creator' if none provided
-
-  # Check if envname is in the cached list
-  echo "$CACHED_CONDA_ENVS" | grep -qx "$envname"
-  if [ $? -eq 0 ]; then
-    # Found in the cached list
-    printf "%bActivating environment:%b %b%s%b\n" \
-      "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$envname" "$COLOR_RESET"
-    conda activate "$envname"
-    return 0
-  else
-    # Not in cached list. Possibly the user created a new environment in
-    # another session or something. Let's re-check once more.
-    conda_update_cache
-    echo "$CACHED_CONDA_ENVS" | grep -qx "$envname"
-    if [ $? -eq 0 ]; then
-      # Found after re-check
-      printf "%bActivating environment:%b %b%s%b\n" \
-        "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$envname" "$COLOR_RESET"
-      conda activate "$envname"
-      return 0
     fi
   fi
 
-  # If we get here, the env doesn't exist
-  printf "%bError:%b Environment '%s' not found.\n" \
-    "$COLOR_RED" "$COLOR_RESET" "$envname" 1>&2
-  printf "Create it with: %bconda create --name %s%b\n" \
-    "$COLOR_GREEN" "$envname" "$COLOR_RESET"
-  return 1
+  env_arg="$1"
+
+  # Case 1: No argument provided
+  if [ -z "$env_arg" ]; then
+    conda_list_cached_envs_with_creator
+    printf "\n%bNo environment specified. Defaulting to 'creator'.%b\n" \
+      "$COLOR_BLUE" "$COLOR_RESET"
+    env_arg="creator"
+  fi
+
+  # Case 2: If the user specified 'creator', skip the cache check
+  if [ "$env_arg" != "creator" ]; then
+    # Check if the specified environment exists in the cached list
+    echo "$CACHED_CONDA_ENVS" | grep -qx "$env_arg"
+    if [ $? -ne 0 ]; then
+      # Environment not found; update cache and recheck
+      conda_update_cache
+      echo "$CACHED_CONDA_ENVS" | grep -qx "$env_arg"
+      if [ $? -ne 0 ]; then
+        # Still not found; provide error and fallback to 'creator'
+        printf "%bError:%b Environment '%s' not found.\n" \
+          "$COLOR_RED" "$COLOR_RESET" "$env_arg" 1>&2
+        printf "You can create it with: %bconda create --name %s%b\n\n" \
+          "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
+
+        # List existing environments again
+        conda_list_cached_envs_with_creator
+        printf "\n%bDefaulting to 'creator'...%b\n" \
+          "$COLOR_YELLOW" "$COLOR_RESET"
+        env_arg="creator"
+      fi
+    fi
+  fi
+
+  # Attempt to activate the chosen environment
+  printf "%bActivating environment:%b %b%s%b\n" \
+    "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
+  conda activate "$env_arg"
+  return 0
 }
 
 ###############################################################################
 # 6. Final Touches
+#    (Exports PATH and displays a startup message in interactive shells)
 ###############################################################################
 export PATH
 
-# Optionally display a short message once per interactive shell
-# (Remove or comment out if you prefer silence.)
+# Display a startup message for interactive shells
 if [ -n "${PS1:-}" ]; then
-  printf "%bSterling environment loaded. Cluster: %b%s%b\n" \
-    "$COLOR_YELLOW" "$COLOR_GREEN" "${CLUSTER_NAME:-unknown}" "$COLOR_RESET"
+  printf "%bSterling environment loaded. Cluster:%b %s\n" \
+    "$COLOR_YELLOW" "$COLOR_RESET" "${CLUSTER_NAME:-unknown}"
 fi
 
-# End of environment script
+###############################################################################
+# End of Sterling Group Environment Setup
 ###############################################################################
