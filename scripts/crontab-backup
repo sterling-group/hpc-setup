@@ -13,4 +13,4 @@ PATH=/usr/local/bin:/usr/bin:/bin
 #MAILTO=$USER@utdallas.edu
 
 # Run backup.sh daily at 02:00
-0 2 * * * /mfs/io/groups/sterling/setup/backup.sh
+0 2 * * * /groups/sterling/setup/backup.sh
