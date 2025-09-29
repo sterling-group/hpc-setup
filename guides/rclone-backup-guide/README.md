@@ -10,7 +10,6 @@
 - [Rclone Backup to Box for Cluster](#rclone-backup-to-box-for-cluster)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
-  - [This tutorial explains how to configure `rclone` on your cluster to back up `/mfs/io/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/mfs/io/groups/sterling/setup`.](#this-tutorial-explains-how-to-configure-rclone-on-your-cluster-to-back-up-mfsiogroupssterlingmfshomeuser-to-a-box-directory-named-cluster-backup-with-subfolders-for-daily-archive-and-logs-and-how-to-schedule-it-via-cron-users-in-the-sterling-group-only-need-to-run-the-commands-in-sections-34-5-and7-the-scripts-are-maintained-centrally-under-mfsiogroupssterlingsetup)
   - [Prerequisites](#prerequisites)
   - [Configure the Box remote with offline authorization](#configure-the-box-remote-with-offline-authorization)
   - [Create the Box folder hierarchy](#create-the-box-folder-hierarchy)
@@ -27,23 +26,19 @@
 
 ## Introduction
 
-This tutorial explains how to configure `rclone` on your cluster to back up `/mfs/io/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/mfs/io/groups/sterling/setup`.
+This tutorial explains how to configure `rclone` on your cluster to back up `/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/groups/sterling/setup`.
 
 ## Prerequisites
 
-- **rclone** (v1.38 or later) installed on both the cluster and your desktop (with a browser)
-- Confirm **rclone versions** match:
-  ```bash
-  /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone version
-  rclone version
-  ```
-- A Box Enterprise SSO account
+- **rclone** (v1.38 or later) available on the cluster
+- A Box Enterprise SSO account  
 - Shell access to the cluster with `cron` available
+- Web browser access (for OAuth authentication)
 
 > **Tip:** Before running any live syncs, you can test with `--dry-run` to see what would transfer or delete without affecting Box.
 > ```bash
-> /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone sync \
->   /mfs/io/groups/sterling/mfshome/$USER box:cluster-backup/daily \
+> /groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone sync \
+>   /groups/sterling/mfshome/$USER box:cluster-backup/daily \
 >   --dry-run --fast-list --checksum
 > ```
 
@@ -54,7 +49,7 @@ This tutorial explains how to configure `rclone` on your cluster to back up `/mf
 On the cluster, run rclone using its full path:
 
 ```bash
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone config
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone config
 ```
 
 Press Enter to accept each default (shown in `<angle brackets>`):
@@ -87,8 +82,10 @@ rclone will then **print** a command, e.g.:
 rclone authorize "box" "xxxxxxxxxxxxxxxx"
 ```
 
-1. **Copy** that exact command, **switch to your local machine**, paste and run it. Complete the OAuth flow in your browser. It will print a **long token string**.  
-2. **Back on the cluster**, paste **only** that token at:
+1. **Open a new terminal** on the cluster **(keep the original rclone config terminal open)** and run that exact command. It will display a URL.
+2. **Copy the URL** and **open it in your web browser** to complete the OAuth flow.
+3. **Back in the new terminal**, it will print a **long token string**.
+4. **Copy that token** and **return to the original terminal** to paste it at the rclone config prompt:
    ```text
    config_token> xxxxxxxxxxxxxxxx...xxx
    ```
@@ -99,7 +96,7 @@ rclone authorize "box" "xxxxxxxxxxxxxxxx"
    ```
 4. Verify:
    ```bash
-   /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:
+   /groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:
    ```
 
 ---
@@ -110,17 +107,17 @@ Run once on the cluster using the full rclone path:
 
 ```bash
 # Parent backup folder
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup
 
 # Subfolders
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/daily
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/archive
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/logs
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/daily
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/archive
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/logs
 ```
 
 Verify:
 ```bash
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:cluster-backup
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:cluster-backup
 ```
 
 ---
@@ -137,7 +134,7 @@ mkdir -p ~/logs
 
 ## Reference scripts
 
-Sterling group members **do not** need to write or modify these; they live in `/mfs/io/groups/sterling/setup`.
+Sterling group members **do not** need to write or modify these; they live in `/groups/sterling/setup`.
 
 ### A) `backup.sh`
 ```bash
@@ -156,7 +153,7 @@ Sterling group members **do not** need to write or modify these; they live in `/
 #   backup.sh  (override settings via environment variables as needed)
 #
 # Configuration (env overrides):
-#   DATA_DIR           Local directory to back up (default: /mfs/.../$USER)
+#   DATA_DIR           Local directory to back up (default: /groups/.../$USER)
 #   REMOTE_ROOT        Remote root for backups (default: box:cluster-backup)
 #   RCLONE_BIN         Path to rclone binary (default: rclone-v1.69.1)
 #   LOG_DIR            Directory for local logs (default: $HOME/logs)
@@ -167,10 +164,10 @@ Sterling group members **do not** need to write or modify these; they live in `/
 set -euo pipefail
 
 # --- Configuration (override via env if desired) ------------------------------
-: "${DATA_DIR:=/mfs/io/groups/sterling/mfshome/$USER}"
+: "${DATA_DIR:=/groups/sterling/mfshome/$USER}"
 : "${REMOTE_ROOT:=box:cluster-backup}"
-: "${RCLONE_BIN:=/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone}"
-: "${LOG_DIR:=$HOME/logs}"
+: "${RCLONE_BIN:=/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone}"
+: "${LOG_DIR:=$HOME/logs}
 
 DATE_STR=$(date +%F)
 LOCK_FILE="$HOME/.backup_${USER}.lock"
@@ -278,7 +275,7 @@ main "$@"
 
 Make it executable:
 ```bash
-chmod +x /mfs/io/groups/sterling/setup/backup.sh
+chmod +x /groups/sterling/setup/backup.sh
 ```
 
 ### B) `cronscript`
@@ -298,7 +295,7 @@ PATH=/usr/local/bin:/usr/bin:/bin
 MAILTO=$USER@utdallas.edu
 
 # Run backup.sh daily at 02:00
-0 2 * * * /mfs/io/groups/sterling/setup/backup.sh
+0 2 * * * /groups/sterling/setup/backup.sh
 ```
 
 ---
@@ -308,7 +305,7 @@ MAILTO=$USER@utdallas.edu
 On the cluster, install the pre-written cron script:
 
 ```bash
-crontab /mfs/io/groups/sterling/setup/cronscript
+crontab /groups/sterling/setup/cronscript
 ```
 
 Verify:
@@ -330,8 +327,8 @@ crontab -l
   ```
 - **Test restores:**  
   ```bash
-  /mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy \  
-    box:cluster-backup/daily/path/to/file /tmp && diff /tmp/file /mfs/io/groups/sterling/mfshome/$USER/path/to/file
+  /groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy \  
+    box:cluster-backup/daily/path/to/file /tmp && diff /tmp/file /groups/sterling/mfshome/$USER/path/to/file
   ```
 - **Error notifications:** Cron will email stderr/stdout to `$USER@yourdomain.com`. For advanced alerting, you can grep logs for `ERROR` and pipe to mail or integrate with Slack.
 

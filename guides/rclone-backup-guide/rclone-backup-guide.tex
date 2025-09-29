@@ -58,30 +58,26 @@
 
 \section{Introduction}
 This tutorial explains how to configure \texttt{rclone} on your cluster to back up
-\texttt{/mfs/io/groups/sterling/mfshome/\$USER} to a Box directory named \texttt{cluster-backup},
+\texttt{/groups/sterling/mfshome/\$USER} to a Box directory named \texttt{cluster-backup},
 with subfolders for \texttt{daily}, \texttt{archive}, and \texttt{logs}, and how to
 schedule it via \texttt{cron}. Users in the sterling group only need to run the commands in
 Sections~\ref{sec:configure}--\ref{sec:prepare} and~\ref{sec:install-cron}. The scripts are
-maintained centrally under \verb|/mfs/io/groups/sterling/setup|.
+maintained centrally under \verb|/groups/sterling/setup|.
 
 \section{Prerequisites}
 \begin{itemize}
-  \item \texttt{rclone} (v1.38 or later) installed on both the cluster and your desktop (with a browser).
-  \item Confirm \texttt{rclone} versions match:
-    \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone version
-rclone version
-    \end{lstlisting}
-  \item A Box Enterprise SSO account.
-  \item Shell access to the cluster with \texttt{cron} available.
+  \item \texttt{rclone} (v1.38 or later) installed on the cluster
+  \item A Box Enterprise SSO account
+  \item Shell access to the cluster with \texttt{cron} available
+  \item Web browser access (for OAuth authentication)
 \end{itemize}
 
 \begin{tcolorbox}[title=Tip]
 Before running any live syncs, you can test with \texttt{--dry-run} to see what would transfer
 or delete without affecting Box:
 \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone sync \
-  /mfs/io/groups/sterling/mfshome/$USER box:cluster-backup/daily \
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone sync \
+  /groups/sterling/mfshome/$USER box:cluster-backup/daily \
   --dry-run --fast-list --checksum
 \end{lstlisting}
 \end{tcolorbox}
@@ -90,7 +86,7 @@ or delete without affecting Box:
 \label{sec:configure}
 On the cluster, run \texttt{rclone} using its full path:
 \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone config
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone config
 \end{lstlisting}
 
 Press Enter to accept each default (shown in \texttt{<angle brackets>}):
@@ -118,8 +114,10 @@ y/n> n
 \end{lstlisting}
 
 \begin{enumerate}
-  \item \textbf{Copy} the printed \texttt{rclone authorize} command, switch to your local machine, paste and run it. Complete the OAuth flow in your browser to obtain a long token string.
-  \item Back on the cluster, paste only that token at:
+  \item \textbf{Open a new terminal} on the cluster \textbf{(keep the original rclone config terminal open)} and run that exact command. It will display a URL.
+  \item \textbf{Copy the URL} and \textbf{open it in your web browser} to complete the OAuth flow.
+  \item \textbf{Back in the new terminal}, it will print a \textbf{long token string}.
+  \item \textbf{Copy that token} and \textbf{return to the original terminal} to paste it at the rclone config prompt:
     \begin{verbatim}
 config_token> xxxxxxxxxxxxxxxx...xxx
     \end{verbatim}
@@ -130,7 +128,7 @@ y) y
     \end{verbatim}
   \item Verify:
     \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:
     \end{lstlisting}
 \end{enumerate}
 
@@ -139,16 +137,16 @@ y) y
 Run once on the cluster using the full \texttt{rclone} path:
 \begin{lstlisting}[style=custombash]
 # Parent backup folder
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup
 
 # Subfolders
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/daily
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/archive
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/logs
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/daily
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/archive
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone mkdir box:cluster-backup/logs
 \end{lstlisting}
 Verify:
 \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:cluster-backup
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone lsd box:cluster-backup
 \end{lstlisting}
 
 \section{Prepare the local environment}
@@ -161,7 +159,7 @@ mkdir -p ~/logs
 \section{Reference scripts}
 \label{sec:reference-scripts}
 Sterling group members \emph{do not} need to modify these; they live in
-\verb|/mfs/io/groups/sterling/setup|.
+\verb|/groups/sterling/setup|.
 
 \subsection{A) \texttt{backup.sh}}
 \begin{lstlisting}[style=custombash]
@@ -180,7 +178,7 @@ Sterling group members \emph{do not} need to modify these; they live in
 #   backup.sh  (override settings via environment variables as needed)
 #
 # Configuration (env overrides):
-#   DATA_DIR           Local directory to back up (default: /mfs/.../$USER)
+#   DATA_DIR           Local directory to back up (default: /groups/.../$USER)
 #   REMOTE_ROOT        Remote root for backups (default: box:cluster-backup)
 #   RCLONE_BIN         Path to rclone binary (default: rclone-v1.69.1)
 #   LOG_DIR            Directory for local logs (default: $HOME/logs)
@@ -191,9 +189,9 @@ Sterling group members \emph{do not} need to modify these; they live in
 set -euo pipefail
 
 # --- Configuration (override via env if desired) ------------------------------
-: "${DATA_DIR:=/mfs/io/groups/sterling/mfshome/$USER}"
+: "${DATA_DIR:=/groups/sterling/mfshome/$USER}"
 : "${REMOTE_ROOT:=box:cluster-backup}"
-: "${RCLONE_BIN:=/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone}"
+: "${RCLONE_BIN:=/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone}"
 : "${LOG_DIR:=$HOME/logs}"
 
 DATE_STR=$(date +%F)
@@ -302,7 +300,7 @@ main "$@"
 
 Make it executable:
 \begin{lstlisting}[style=custombash]
-chmod +x /mfs/io/groups/sterling/setup/backup.sh
+chmod +x /groups/sterling/setup/backup.sh
 \end{lstlisting}
 
 \subsection{B) \texttt{cronscript}}
@@ -322,14 +320,14 @@ PATH=/usr/local/bin:/usr/bin:/bin
 MAILTO=$USER@utdallas.edu
 
 # Run backup.sh daily at 02:00
-0 2 * * * /mfs/io/groups/sterling/setup/backup.sh
+0 2 * * * /groups/sterling/setup/backup.sh
 \end{lstlisting}
 
 \section{Install the cron job}
 \label{sec:install-cron}
 On the cluster, install the pre-written cron script:
 \begin{lstlisting}[style=custombash]
-crontab /mfs/io/groups/sterling/setup/cronscript
+crontab /groups/sterling/setup/cronscript
 \end{lstlisting}
 Verify:
 \begin{lstlisting}[style=custombash]
@@ -348,9 +346,9 @@ find ~/logs -type f -mtime +30 -delete
     \end{lstlisting}
   \item \textbf{Test restores:}
     \begin{lstlisting}[style=custombash]
-/mfs/io/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy \
+/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone copy \
   box:cluster-backup/daily/path/to/file /tmp && \
-  diff /tmp/file /mfs/io/groups/sterling/mfshome/$USER/path/to/file
+  diff /tmp/file /groups/sterling/mfshome/$USER/path/to/file
     \end{lstlisting}
   \item \textbf{Error notifications:} Cron will email stderr/stdout to \verb|$USER@yourdomain.com|. For advanced alerting, grep logs for \texttt{ERROR} and pipe to mail or integrate with Slack.
 \end{itemize}
