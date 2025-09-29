@@ -1,6 +1,6 @@
-[submodule "submodules/qorca"]
-	path = submodules/qorca
+[submodule "tools/qorca"]
+	path = tools/qorca
 	url = https://github.com/Markus-G-S-Weiss/qorca.git
-[submodule "submodules/qqchem"]
-	path = submodules/qqchem
+[submodule "tools/qqchem"]
+	path = tools/qqchem
 	url = https://github.com/Markus-G-S-Weiss/qqchem.git
