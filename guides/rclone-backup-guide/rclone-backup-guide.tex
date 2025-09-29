@@ -62,7 +62,7 @@ This tutorial explains how to configure \texttt{rclone} on your cluster to back 
 with subfolders for \texttt{daily}, \texttt{archive}, and \texttt{logs}, and how to
 schedule it via \texttt{cron}. Users in the sterling group only need to run the commands in
 Sections~\ref{sec:configure}--\ref{sec:prepare} and~\ref{sec:install-cron}. The scripts are
-maintained centrally under \verb|/groups/sterling/setup|.
+maintained centrally under \verb|/groups/sterling/hpc-setup|.
 
 \section{Prerequisites}
 \begin{itemize}
@@ -159,7 +159,7 @@ mkdir -p ~/logs
 \section{Reference scripts}
 \label{sec:reference-scripts}
 Sterling group members \emph{do not} need to modify these; they live in
-\verb|/groups/sterling/setup|.
+\verb|/groups/sterling/hpc-setup|.
 
 \subsection{A) \texttt{backup.sh}}
 \begin{lstlisting}[style=custombash]
@@ -300,7 +300,7 @@ main "$@"
 
 Make it executable:
 \begin{lstlisting}[style=custombash]
-chmod +x /groups/sterling/setup/backup.sh
+chmod +x /groups/sterling/hpc-setup/scripts/backup.sh
 \end{lstlisting}
 
 \subsection{B) \texttt{cronscript}}
@@ -320,14 +320,14 @@ PATH=/usr/local/bin:/usr/bin:/bin
 MAILTO=$USER@utdallas.edu
 
 # Run backup.sh daily at 02:00
-0 2 * * * /groups/sterling/setup/backup.sh
+0 2 * * * /groups/sterling/hpc-setup/scripts/backup.sh
 \end{lstlisting}
 
 \section{Install the cron job}
 \label{sec:install-cron}
 On the cluster, install the pre-written cron script:
 \begin{lstlisting}[style=custombash]
-crontab /groups/sterling/setup/cronscript
+crontab /groups/sterling/hpc-setup/scripts/cronscript
 \end{lstlisting}
 Verify:
 \begin{lstlisting}[style=custombash]

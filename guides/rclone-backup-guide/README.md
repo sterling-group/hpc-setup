@@ -26,7 +26,7 @@
 
 ## Introduction
 
-This tutorial explains how to configure `rclone` on your cluster to back up `/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/groups/sterling/setup`.
+This tutorial explains how to configure `rclone` on your cluster to back up `/groups/sterling/mfshome/$USER` to a Box directory named `cluster-backup`, with subfolders for `daily`, `archive`, and `logs`, and how to schedule it via cron. Users in the Sterling group only need to run the commands in sections 3, 4, 5 and 7. The scripts are maintained centrally under `/groups/sterling/hpc-setup`.
 
 ## Prerequisites
 
@@ -134,7 +134,7 @@ mkdir -p ~/logs
 
 ## Reference scripts
 
-Sterling group members **do not** need to write or modify these; they live in `/groups/sterling/setup`.
+Sterling group members **do not** need to write or modify these; they live in `/groups/sterling/hpc-setup`.
 
 ### A) `backup.sh`
 ```bash
@@ -275,7 +275,7 @@ main "$@"
 
 Make it executable:
 ```bash
-chmod +x /groups/sterling/setup/backup.sh
+chmod +x /groups/sterling/hpc-setup/scripts/backup.sh
 ```
 
 ### B) `cronscript`
@@ -295,7 +295,7 @@ PATH=/usr/local/bin:/usr/bin:/bin
 MAILTO=$USER@utdallas.edu
 
 # Run backup.sh daily at 02:00
-0 2 * * * /groups/sterling/setup/backup.sh
+0 2 * * * /groups/sterling/hpc-setup/scripts/backup.sh
 ```
 
 ---
@@ -304,8 +304,17 @@ MAILTO=$USER@utdallas.edu
 
 On the cluster, install the pre-written cron script:
 
+**For production deployment:**
 ```bash
-crontab /groups/sterling/setup/cronscript
+crontab /groups/sterling/hpc-setup/scripts/crontab-backup
+```
+
+**For git clone - update path first:**
+```bash
+# Create a local copy and update the path
+sed "s|/groups/sterling/hpc-setup/scripts/backup.sh|$(pwd)/scripts/backup.sh|" scripts/crontab-backup > /tmp/my-crontab
+crontab /tmp/my-crontab
+rm /tmp/my-crontab
 ```
 
 Verify:
