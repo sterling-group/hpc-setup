@@ -1,0 +1,6 @@
+[submodule "submodules/qorca"]
+	path = submodules/qorca
+	url = https://github.com/Markus-G-S-Weiss/qorca.git
+[submodule "submodules/qqchem"]
+	path = submodules/qqchem
+	url = https://github.com/Markus-G-S-Weiss/qqchem.git
