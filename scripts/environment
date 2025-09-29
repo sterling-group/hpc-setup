@@ -183,13 +183,15 @@ activate() {
 
     local env_arg="$1"
 
-    # No argument: list environments (excluding base)
+    # No argument: list environments (excluding base) with usage instructions
     if [ -z "$env_arg" ]; then
         printf "%b# Available conda environments:%b\n" "$COLOR_BLUE" "$COLOR_RESET"
         echo
         conda_fast_env_list | grep -v '^  base '
         echo
-        printf "%bUsage:%b activate <env_name>\n" "$COLOR_YELLOW" "$COLOR_RESET"
+        printf "%bUsage:%b\n" "$COLOR_YELLOW" "$COLOR_RESET"
+        printf "  %bactivate <env_name>%b     - Activate an existing environment\n" "$COLOR_GREEN" "$COLOR_RESET"
+        printf "  %bconda create -n <name>%b - Create a new environment\n" "$COLOR_GREEN" "$COLOR_RESET"
         return 0
     fi  
 
