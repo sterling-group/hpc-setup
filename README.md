@@ -1,5 +1,7 @@
 # HPC Setup
 
+*Author: Markus G. S. Weiss*  
+
 Welcome to the **HPC Setup** repository! This comprehensive collection provides everything you need to configure and manage High‑Performance Computing (HPC) clusters, including:
 
 - **Step-by-step guides** for cluster configuration and access
@@ -87,5 +89,3 @@ Please feel free to submit a pull request or open an issue.
 This project is licensed under the [LICENSE](LICENSE) specified in this repository.
 
 ---
-
-**Author:** Markus G. S. Weiss
