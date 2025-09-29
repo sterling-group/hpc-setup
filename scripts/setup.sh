@@ -21,17 +21,24 @@
 
 CLUSTER_NAME=$(scontrol show config | grep -oP '^ClusterName\s*=\s*\K\S+' || echo 'unknown')
 
+# Get script directory for environment file location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_SCRIPT="${SCRIPT_DIR}/environment"
+
 # Define paths based on cluster name
 if [ "$CLUSTER_NAME" = "g2" ]; then
     MFSHOME="/groups/sterling/mfshome/$USER"
-    SETUP_SCRIPT="/groups/sterling/setup/environment"
 elif [ "$CLUSTER_NAME" = "juno" ]; then
     MFSHOME="/groups/sterling/mfshome/$USER"
-    SETUP_SCRIPT="/groups/sterling/setup/environment"
 else
     echo "Unknown cluster name: $CLUSTER_NAME"
     exit 1
 fi
+
+# Verify environment script exists
+[ ! -f "$SETUP_SCRIPT" ] && { echo "Error: Environment script not found: $SETUP_SCRIPT"; exit 1; }
+
+echo "Using environment script: $SETUP_SCRIPT"
 
 # Check if the directory exists
 if [ ! -d "$MFSHOME" ]; then
