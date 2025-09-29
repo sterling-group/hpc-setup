@@ -191,7 +191,7 @@ activate() {
         echo
         printf "%bUsage:%b\n" "$COLOR_YELLOW" "$COLOR_RESET"
         printf "  %bactivate <env_name>%b     - Activate an existing environment\n" "$COLOR_GREEN" "$COLOR_RESET"
-        printf "  %bconda create -n <name>%b - Create a new environment\n" "$COLOR_GREEN" "$COLOR_RESET"
+        printf "  %bconda create -n <env_name>%b - Create a new environment\n" "$COLOR_GREEN" "$COLOR_RESET"
         return 0
     fi  
 
@@ -200,7 +200,7 @@ activate() {
         printf "%bWarning:%b Refusing to activate '%bbase%b' environment.\n" \
             "$COLOR_YELLOW" "$COLOR_RESET" "$COLOR_RED" "$COLOR_RESET"
         printf "%bCreate a new environment instead:%b\n" "$COLOR_BLUE" "$COLOR_RESET"
-        printf "  %bconda create -n <name>%b\n" "$COLOR_GREEN" "$COLOR_RESET"
+        printf "  %bconda create -n <env_name>%b\n" "$COLOR_GREEN" "$COLOR_RESET"
         return 1
     fi  
 
