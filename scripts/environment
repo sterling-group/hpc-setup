@@ -55,7 +55,7 @@ case "$CLUSTER_NAME" in
     ;;  
   juno)
     STERLING_GROUP="$JUNO_STERLING_GROUP"
-    CONDA_ROOT="$JUNO_STERLING_GROUP/miniconda3"
+    CONDA_ROOT="$JUNO_STERLING_GROUP/software-tools/miniconda"
     ;;  
 esac
 
