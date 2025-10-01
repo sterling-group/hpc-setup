@@ -55,7 +55,7 @@ case "$CLUSTER_NAME" in
     ;;  
   juno)
     STERLING_GROUP="$JUNO_STERLING_GROUP"
-    CONDA_ROOT="$JUNO_STERLING_GROUP/software-tools/miniconda"
+    CONDA_ROOT="$JUNO_STERLING_GROUP/miniconda3"
     ;;  
 esac
 
@@ -111,6 +111,11 @@ cl() {
 #    (Defines the `activate` function for managing Conda environments)
 ###############################################################################
 
+# Set default conda environments path - directs new environments to user's home directory
+# Users can override this by exporting CONDA_ENVS_PATH before or after sourcing this script:
+#   export CONDA_ENVS_PATH="/custom/path/to/envs"
+export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$HOME/.conda/envs}"
+
 # Flag to track if conda has been initialized
 CONDA_INIT_DONE=""
 
@@ -145,8 +150,8 @@ conda_fast_env_list() {
     fi  
     
     # Fallback: scan filesystem for unregistered environments
-    # Find all conda envs directories dynamically
-    for envdir in /*/envs /*/*/envs /*/*/*/envs "$HOME/.conda/envs" "$HOME"/*/envs; do
+    # Find all conda envs directories dynamically, prioritizing user locations first
+    for envdir in "$CONDA_ENVS_PATH" "$HOME/.conda/envs" "$HOME"/*/envs /*/*/envs /*/*/*/envs; do
         [ ! -d "$envdir" ] && continue
         
         for envpath in "$envdir"/*; do
