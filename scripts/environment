@@ -151,7 +151,7 @@ conda_fast_env_list() {
     
     # Fallback: scan filesystem for unregistered environments
     # Find all conda envs directories dynamically, prioritizing user locations first
-    for envdir in "$CONDA_ENVS_PATH" "$HOME/.conda/envs" "$HOME"/*/envs /*/*/envs /*/*/*/envs; do
+    for envdir in "$CONDA_ENVS_PATH" "$HOME/.conda/envs" "$CONDA_ROOT/envs" "$HOME"/*/envs "/*/*/*/*/envs"; do
         [ ! -d "$envdir" ] && continue
         
         for envpath in "$envdir"/*; do
