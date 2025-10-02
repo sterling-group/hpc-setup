@@ -115,7 +115,7 @@ cl() {
 # Users can override this by exporting CONDA_ENVS_PATH before or after sourcing this script:
 #   export CONDA_ENVS_PATH="/custom/path/to/envs"
 if [ -n "$MFSHOME" ]; then
-  export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$MFSHOME/.envs:$MFSHOME}"
+  export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$MFSHOME/.envs:$HOME/.conda/envs}"
 else
   export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$HOME/.conda/envs}"
 fi
