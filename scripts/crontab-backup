@@ -14,3 +14,5 @@ PATH=/usr/local/bin:/usr/bin:/bin
 
 # Run backup.sh daily at 02:00
 0 2 * * * /groups/sterling/hpc-setup/scripts/backup.sh
+# End of crontab
+###############################################################################
