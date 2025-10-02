@@ -114,7 +114,11 @@ cl() {
 # Set default conda environments path - directs new environments to HPC home directory
 # Users can override this by exporting CONDA_ENVS_PATH before or after sourcing this script:
 #   export CONDA_ENVS_PATH="/custom/path/to/envs"
-export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-${MFSHOME:+$MFSHOME/.envs}${MFSHOME:+}${MFSHOME:-$HOME/.conda/envs}}"
+if [ -n "$MFSHOME" ]; then
+  export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$MFSHOME/.envs:$MFSHOME}"
+else
+  export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$HOME/.conda/envs}"
+fi
 
 # Flag to track if conda has been initialized
 CONDA_INIT_DONE=""
