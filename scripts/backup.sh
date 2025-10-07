@@ -87,7 +87,7 @@ prune_remote_snapshots() {
 backup_daily() {
   local src="$DATA_DIR" dest="$REMOTE_ROOT/daily" logf="$LOG_DIR/backup-$DATE_STR.log"
   echo "[$(date '+%F %T')] Starting daily backup from $src to $dest..." >> "$logf"
-  retry "$RCLONE_BIN sync '$src' '$dest' $RCLONE_OPTS --exclude '.envs/**' --log-file '$logf'"
+  retry "$RCLONE_BIN sync '$src' '$dest' $RCLONE_OPTS --exclude 'envs/**' --log-file '$logf'"
   echo "[$(date '+%F %T')] Daily backup completed." >> "$logf"
 }
 
@@ -96,7 +96,7 @@ snapshot_weekly() {
   if [[ "$(date +%u)" == "7" ]]; then
     local src="$DATA_DIR" dest="$REMOTE_ROOT/archive/$DATE_STR" logf="$LOG_DIR/snapshot-$DATE_STR.log"
     echo "[$(date '+%F %T')] Starting weekly snapshot from $src to $dest..." >> "$logf"
-    retry "$RCLONE_BIN copy '$src' '$dest' $RCLONE_OPTS --exclude '.envs/**' --log-file '$logf'"
+    retry "$RCLONE_BIN copy '$src' '$dest' $RCLONE_OPTS --exclude 'envs/**' --log-file '$logf'"
     echo "[$(date '+%F %T')] Weekly snapshot completed." >> "$logf"
   fi  
 }
