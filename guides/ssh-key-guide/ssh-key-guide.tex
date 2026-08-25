@@ -224,7 +224,7 @@ ssh-copy-id your_netid@ganymede2.circ.utdallas.edu
         \item Open \textbf{Command Prompt}.
         \item Use the following command to copy your public key to the server. Replace \texttt{your\_netid} with your actual NetID:
         \begin{lstlisting}[style=custombash]
-type %USERPROFILE%\.ssh\id_ed25519.pub | ssh your_netid@ganymede2.circ.utdallas.edu "cat >> /home/your_netid/.ssh/authorized_keys"
+type %USERPROFILE%\.ssh\id_ed25519.pub | ssh your_netid@ganymede2.circ.utdallas.edu "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
         \end{lstlisting}
         \item When prompted, enter your \textbf{NetID password}.
         \item This command appends your public key to the \texttt{authorized\_keys} file on the server automatically.
