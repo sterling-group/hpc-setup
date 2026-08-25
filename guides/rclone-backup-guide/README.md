@@ -150,7 +150,7 @@ Sterling group members **do not** need to write or modify these; they live in `/
 #   - Weekly snapshots (Sundays) to REMOTE_ROOT/archive/<date>, copied server-side
 #     from REMOTE_ROOT/daily so no data is re-uploaded from the cluster.
 #   - Prunes local logs older than 30 days (find -mtime +30, so ~31 in practice)
-#   - Prunes remote snapshots whose DIRECTORY DATE is older than 28 days
+#   - Keeps the newest REMOTE_KEEP_SNAPSHOTS weekly snapshots (4 = about a month)
 #   - Uploads logs to remote (copy, so remote logs are not mirror-pruned)
 # Usage:
 #   backup.sh  (override settings via environment variables as needed)
@@ -192,8 +192,10 @@ RCLONE_OPTS="--fast-list --checksum --log-level WARNING"
 MAX_RETRIES=3
 RETRY_DELAY=10
 
-# Snapshot retention (days)
-REMOTE_RETENTION_DAYS=28
+# How many weekly snapshots to keep. Counted, not dated: a run that is skipped
+# (the lock is held, or a failure) would silently cost us a snapshot under a
+# date cutoff, whereas a count keeps the newest four whenever they were taken.
+REMOTE_KEEP_SNAPSHOTS=4
 
 # Refuse a sync that would delete more than this many remote files in one run.
 # Guards against mirroring an empty source (e.g. an unmounted $DATA_DIR) onto the
@@ -269,38 +271,44 @@ prune_local_logs() {
 }
 
 # --- 2) Prune old remote snapshots --------------------------------------------
-# Snapshots are pruned by the DATE IN THE DIRECTORY NAME, not by file age.
-#
-# The previous implementation used `rclone delete --min-age 28d`, which filters on
-# each object's modification time. rclone copy stamps the source file's mtime onto
-# the object it writes, so a snapshot of a file last edited two years ago contained
-# an object rclone considered two years old and deleted it the very next night.
-# Anything not modified within the retention window was removed from the archive
-# almost immediately, while the dated folders stayed behind and made the archive
-# look healthy. Note `--rmdirs` does not help: an active --min-age filter
-# suppresses the rmdirs pass.
+# Keeps the newest N dated folders. Do NOT go back to `rclone delete --min-age`:
+# that filters on each object's modification time, which rclone copy inherits from
+# the source file, so it deleted long-untouched files from a snapshot taken the day
+# before while leaving the empty dated folder behind to look healthy.
 prune_remote_snapshots() {
-  local logf="$LOG_DIR/backup-$DATE_STR.log" cutoff snap
-  # RCLONE_OPTS is a flag list; split it into an array so this direct (non-eval)
-  # invocation can pass it properly quoted.
-  local -a opts; read -r -a opts <<< "$RCLONE_OPTS"
-  cutoff=$(date -d "-${REMOTE_RETENTION_DAYS} days" +%F)
-  echo "[$(date '+%F %T')] Pruning remote snapshots dated before $cutoff..." >> "$logf"
+  local logf="$LOG_DIR/backup-$DATE_STR.log" snap
+  # RCLONE_OPTS is a flag list; split it so this direct (non-eval) call can pass
+  # it properly quoted.
+  local -a opts snaps=()
+  read -r -a opts <<< "$RCLONE_OPTS"
 
   # lsf --dirs-only yields "2026-08-23/" one per line.
   while read -r snap; do
     snap="${snap%/}"
     # Ignore anything that is not a YYYY-MM-DD folder rather than guessing at it.
-    [[ "$snap" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+    if [[ ! "$snap" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
       echo "[$(date '+%F %T')] Skipping unrecognised archive entry: $snap" >> "$logf"
       continue
-    }
-    if [[ "$snap" < "$cutoff" ]]; then
-      echo "[$(date '+%F %T')] Purging snapshot $snap" >> "$logf"
-      # purge, not delete: removes the directory too, so no empty shells accumulate.
-      retry "$RCLONE_BIN purge '$REMOTE_ROOT/archive/$snap' $RCLONE_OPTS --log-file '$logf'"
     fi
+    snaps+=("$snap")
   done < <("$RCLONE_BIN" lsf --dirs-only "$REMOTE_ROOT/archive" "${opts[@]}" --log-file "$logf")
+
+  if (( ${#snaps[@]} == 0 )); then
+    echo "[$(date '+%F %T')] No snapshots to prune." >> "$logf"
+    return 0
+  fi
+
+  # YYYY-MM-DD sorts lexicographically the same as chronologically, so a reverse
+  # sort puts the newest first and everything past the Nth is surplus.
+  mapfile -t snaps < <(printf '%s\n' "${snaps[@]}" | sort -r)
+  echo "[$(date '+%F %T')] ${#snaps[@]} snapshot(s) present; keeping the newest $REMOTE_KEEP_SNAPSHOTS." >> "$logf"
+
+  local i
+  for (( i = REMOTE_KEEP_SNAPSHOTS; i < ${#snaps[@]}; i++ )); do
+    echo "[$(date '+%F %T')] Purging snapshot ${snaps[i]}" >> "$logf"
+    # purge, not delete: removes the directory too, so no empty shells accumulate.
+    retry "$RCLONE_BIN purge '$REMOTE_ROOT/archive/${snaps[i]}' $RCLONE_OPTS --log-file '$logf'"
+  done
 
   echo "[$(date '+%F %T')] Pruned remote snapshots." >> "$logf"
 }
