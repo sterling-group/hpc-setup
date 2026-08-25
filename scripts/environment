@@ -188,7 +188,7 @@ conda_fast_env_list() {
     search_dirs="$search_dirs:$HOME/.conda/envs:$CONDA_ROOT/envs"
     
     # Split on ':' without word splitting, which zsh does not do by default.
-    local rest="$search_dirs" envdir
+    local rest="$search_dirs" envdir envpath
     while [ -n "$rest" ]; do
         envdir="${rest%%:*}"
         case "$rest" in
