@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # Crontab: sterling's backup jobs
 # Description:
-#   Runs the master backup.sh every day, with all pruning and log‐uploads
+#   Runs the master backup.sh every day, with all pruning and log-uploads
 #   handled internally in that script.
 #
 # Author: Markus G. S. Weiss

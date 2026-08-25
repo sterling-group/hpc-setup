@@ -69,9 +69,15 @@ External tools integrated as git submodules for job submission and workflow mana
    ```
 
 3. **Configure backups** (optional):
+
+   Complete the [Rclone Backup guide](guides/rclone-backup-guide/README.md) first —
+   the Box remote and its folder hierarchy must exist before the job will run.
+
    ```bash
-   # Follow the rclone backup guide
-   crontab scripts/crontab-backup
+   # `crontab <file>` REPLACES your entire crontab. Append instead, and rewrite the
+   # hardcoded /groups/sterling path to wherever you cloned this repo.
+   (crontab -l 2>/dev/null; sed "s|/groups/sterling/hpc-setup|$(pwd)|" scripts/crontab-backup) | crontab -
+   crontab -l   # check the result before trusting it
    ```
 
 ## Contributing
