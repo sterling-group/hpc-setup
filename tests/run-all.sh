@@ -35,7 +35,8 @@ run() {  # run <name> <command...>
 note_skip() { printf '\n=== %s ===\n  skipped: %s\n' "$1" "$2"; skip=$((skip + 1)); }
 
 SHELL_FILES=(scripts/backup.sh scripts/setup.sh scripts/environment
-             tests/test-backup.sh tests/run-all.sh guides/build-pdfs.sh)
+             tests/test-backup.sh tests/test-setup.sh tests/test-environment.sh
+             tests/run-all.sh guides/build-pdfs.sh)
 
 syntax() {
     local rc=0 f
@@ -65,6 +66,11 @@ if command -v rclone >/dev/null; then
 else
     note_skip "backup.sh functional tests" "rclone not installed"
 fi
+
+# These two are hermetic - they build their own sandbox and stub out conda and
+# scontrol, so they need nothing installed.
+run "setup.sh functional tests"     tests/test-setup.sh
+run "environment functional tests"  tests/test-environment.sh
 
 printf '\n---------------------------------------------\n'
 printf '%d passed, %d failed, %d skipped\n' "$pass" "$fail" "$skip"
