@@ -23,6 +23,8 @@
 #   REMOTE_ROOT        Remote root for backups (default: box:cluster-backup)
 #   RCLONE_BIN         Path to rclone binary (default: rclone-v1.69.1)
 #   LOG_DIR            Directory for local logs (default: $HOME/logs)
+#   SETTLE_MAX_WAIT    Seconds to wait for the remote listing to match the source
+#                      before taking the weekly snapshot (default: 300)
 #
 # Author: Markus G. S. Weiss
 # Date:   2025-05-05
@@ -38,6 +40,7 @@ set -euo pipefail
 : "${REMOTE_ROOT:=box:cluster-backup}"
 : "${RCLONE_BIN:=/groups/sterling/software-tools/rclone/rclone-v1.69.1-linux-amd64/rclone}"
 : "${LOG_DIR:=$HOME/logs}"
+: "${SETTLE_MAX_WAIT:=300}"
 
 DATE_STR=$(date +%F)
 # Weekday captured once, next to DATE_STR, so a run that crosses midnight cannot
@@ -199,6 +202,47 @@ backup_daily() {
   echo "[$(date '+%F %T')] Daily backup completed." >> "$logf"
 }
 
+# --- Utility: let the remote listing catch up ---------------------------------
+# The weekly snapshot copies server-side from daily/, which rclone reads through a
+# listing. If the object store has not yet published a just-finished upload, the
+# snapshot would silently miss it. Wait until the remote reports what the source
+# holds -- object count and byte total, so this is a listing on each side with no
+# hashing -- backing off up to SETTLE_MAX_WAIT. Doubles as a check that the sync
+# actually transferred everything it should have.
+wait_for_daily_to_settle() {
+  local logf="$1" waited=0 delay=5 want got
+  local -a opts; read -r -a opts <<< "$RCLONE_OPTS"
+
+  want=$("$RCLONE_BIN" size "$DATA_DIR" --json --exclude '/envs/**' "${opts[@]}" 2>/dev/null)
+  if [[ -z "$want" ]]; then
+    echo "[$(date '+%F %T')] WARN: could not size $DATA_DIR; snapshotting without the settle check." >> "$logf"
+    return 1
+  fi
+
+  while :; do
+    got=$("$RCLONE_BIN" size "$REMOTE_ROOT/daily" --json "${opts[@]}" 2>/dev/null)
+    if [[ "$want" == "$got" ]]; then
+      echo "[$(date '+%F %T')] Remote daily matches source after ${waited}s: $want" >> "$logf"
+      return 0
+    fi
+    if (( waited >= SETTLE_MAX_WAIT )); then
+      {
+        echo "[$(date '+%F %T')] WARN: remote daily still differs after ${waited}s."
+        echo "[$(date '+%F %T')]       source=$want"
+        echo "[$(date '+%F %T')]       remote=$got"
+        echo "[$(date '+%F %T')]       Taking the snapshot anyway; it mirrors whatever daily holds."
+      } >> "$logf"
+      return 1
+    fi
+    # never sleep past the bound, so SETTLE_MAX_WAIT is a real ceiling
+    (( delay > SETTLE_MAX_WAIT - waited )) && delay=$(( SETTLE_MAX_WAIT - waited ))
+    echo "[$(date '+%F %T')] Remote daily not settled yet; retrying in ${delay}s (waited ${waited}s)." >> "$logf"
+    sleep "$delay"
+    waited=$(( waited + delay ))
+    (( delay < 60 )) && delay=$(( delay * 2 ))
+  done
+}
+
 # --- 4) Weekly snapshot (Sundays) --------------------------------------------
 # Snapshots copy SERVER-SIDE from the daily mirror rather than re-uploading the
 # whole home directory from the cluster every week. rclone's Box backend supports
@@ -216,6 +260,8 @@ snapshot_weekly() {
     return 0
   fi
   local src="$REMOTE_ROOT/daily" dest="$REMOTE_ROOT/archive/$DATE_STR"
+  # A mismatch is reported, not fatal: the snapshot mirrors daily either way.
+  wait_for_daily_to_settle "$logf" || true
   echo "[$(date '+%F %T')] Starting weekly snapshot from $src to $dest..." >> "$logf"
   retry "$RCLONE_BIN copy '$src' '$dest' $RCLONE_OPTS --log-file '$logf'"
   echo "[$(date '+%F %T')] Weekly snapshot completed." >> "$logf"
