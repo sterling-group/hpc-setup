@@ -17,6 +17,13 @@
 #                               quoting it as one path made this fallback dead
 #   6 name matching           - env names are literals, not regexes
 #   7 activate behaviour      - refuses base, activates what exists
+#   8 pipefail                - grep -q SIGPIPEd the producer, so a real env
+#                               intermittently came back as "not found"
+#   9 strict callers, calling - `activate` with no argument aborted on $1
+#  10 set -e callers          - grep -v exits 1 when it filters everything away
+#  11 CONDA_ROOT is exported  - the documented conda.sh fallback needs it in a
+#                               child shell
+#  12 no variable leakage     - the fallback loop counter escaped the function
 #
 # Usage: tests/test-environment.sh
 # ------------------------------------------------------------------------------
@@ -52,6 +59,12 @@ mkdir -p "$GROUP/mfshome/$USER/envs/unregistered/conda-meta"
 mkdir -p "$GROUP/mfshome/$USER/envs/dot.name/conda-meta"
 echo "$GROUP/mfshome/$USER/envs/registered" > "$T/home/.conda/environments.txt"
 
+# Filler environments. Test 8 needs conda_fast_env_list to still be writing when
+# `grep -q` exits on the first line -- with only three environments the producer
+# finishes first and the SIGPIPE never happens, so the test would pass against
+# the very bug it exists to catch.
+for i in $(seq 1 300); do mkdir -p "$GROUP/mfshome/$USER/envs/filler$i/conda-meta"; done
+
 # a copy of the file with the group root pointed at the sandbox
 sed -e "s|^G2_STERLING_GROUP=.*|G2_STERLING_GROUP=\"$GROUP\"|" \
     -e "s|^JUNO_STERLING_GROUP=.*|JUNO_STERLING_GROUP=\"$GROUP\"|" \
@@ -63,7 +76,7 @@ run() {  # run <extra-env> <code>
         bash -c "$1 . '$T/environment' >/dev/null 2>&1; $2"
 }
 
-echo "== 1/7 sourcing is clean in a non-interactive shell =="
+echo "== 1/12 sourcing is clean in a non-interactive shell =="
 out=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
       bash -c "unset PS1; CLUSTER_NAME=g2; . '$T/environment'" 2>/dev/null)
 check "nothing on stdout" "${out:-<empty>}" "<empty>"
@@ -71,7 +84,7 @@ cwd=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
       bash -c "cd /tmp; unset PS1; CLUSTER_NAME=g2; . '$T/environment' >/dev/null 2>&1; pwd")
 check "working directory unchanged" "$cwd" "/tmp"
 
-echo "== 2/7 sourcing survives a caller running set -u =="
+echo "== 2/12 sourcing survives a caller running set -u =="
 rc=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
      bash -c "set -u; PS1='\$ '; CLUSTER_NAME=g2; . '$T/environment' >/dev/null 2>&1; echo \$?")
 check "no unbound-variable abort" "$rc" "0"
@@ -79,12 +92,12 @@ rc=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
      bash -c "set -u; PS1='\$ '; . '$T/environment' >/dev/null 2>&1; echo \$?")
 check "also with CLUSTER_NAME unset" "$rc" "0"
 
-echo "== 3/7 an unrecognised cluster warns instead of silently skipping =="
+echo "== 3/12 an unrecognised cluster warns instead of silently skipping =="
 err=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
       bash -c "PS1='\$ '; CLUSTER_NAME=nosuchcluster; . '$T/environment'" 2>&1 >/dev/null)
 check "warns on stderr" "$(printf '%s' "$err" | grep -c 'Unknown CLUSTER_NAME')" "1"
 
-echo "== 4/7 a user-exported CONDA_ROOT is respected =="
+echo "== 4/12 a user-exported CONDA_ROOT is respected =="
 got=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
       bash -c "export CONDA_ROOT=/my/own/conda; PS1='\$ '; CLUSTER_NAME=g2; . '$T/environment' >/dev/null 2>&1; echo \$CONDA_ROOT")
 check "kept on a known cluster" "$got" "/my/own/conda"
@@ -95,14 +108,14 @@ got=$(env -i HOME="$T/home" PATH="$PATH" USER="$USER" \
       bash -c "PS1='\$ '; CLUSTER_NAME=g2; . '$T/environment' >/dev/null 2>&1; echo \$CONDA_ROOT")
 check "cluster default still applies when unset" "$got" "$CONDA"
 
-echo "== 5/7 the colon-separated CONDA_ENVS_PATH is split, not treated as one path =="
+echo "== 5/12 the colon-separated CONDA_ENVS_PATH is split, not treated as one path =="
 # hide the registry so ONLY the filesystem fallback can find anything
 mv "$T/home/.conda/environments.txt" "$T/home/.conda/environments.txt.off"
 n=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "conda_fast_env_list | wc -l")
 check "fallback finds on-disk envs" "$([ "$n" -ge 3 ] && echo y || echo n)" "y"
 mv "$T/home/.conda/environments.txt.off" "$T/home/.conda/environments.txt"
 
-echo "== 6/7 env names are matched literally, not as regexes =="
+echo "== 6/12 env names are matched literally, not as regexes =="
 # 'dot.name' exists; 'dotXname' must NOT match it, and a bracket must not error
 m=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "conda_fast_env_list | grep -cF '  dot.name '")
 check "the real name is found" "$m" "1"
@@ -111,11 +124,45 @@ check "a near-miss name is rejected" "$out" "1"
 out=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "activate 'a[b' 2>&1 | grep -c 'not found'")
 check "a bracketed name does not break grep" "$out" "1"
 
-echo "== 7/7 activate refuses base and activates what exists =="
+echo "== 7/12 activate refuses base and activates what exists =="
 out=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "activate base 2>&1 | grep -ci refusing")
 check "refuses base" "$out" "1"
 out=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "activate registered >/dev/null 2>&1; echo \$CONDA_PREFIX")
 check "activates a real env" "$out" "activated:registered"
+
+echo "== 8/12 a real environment activates under set -o pipefail =="
+# `grep -q` exits at the first match and SIGPIPEs conda_fast_env_list, which
+# under pipefail failed the pipeline. It is a race, so one run proves nothing.
+fails=0
+for _ in $(seq 20); do
+    got=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "set -o pipefail; activate registered >/dev/null 2>&1; echo \$CONDA_PREFIX")
+    [ "$got" = "activated:registered" ] || fails=$((fails+1))
+done
+check "20 consecutive runs all activate" "$fails" "0"
+
+echo "== 9/12 activate with no argument survives set -u =="
+rc=$(run "set -u; PS1='\$ '; CLUSTER_NAME=g2;" "activate >/dev/null 2>&1; echo \$?")
+check "no unbound-variable abort on \$1" "$rc" "0"
+
+echo "== 10/12 a base-only listing does not kill a set -e caller =="
+# a HOME with no registry and no env dirs, so the listing is empty and the
+# `grep -v` that drops base filters every line away
+mkdir -p "$T/emptyhome"
+# CONDA_ENVS_PATH must point away from the sandbox envs too, or the listing is
+# not empty and grep -v succeeds.
+out=$(env -i HOME="$T/emptyhome" PATH="$PATH" USER="$USER" CONDA_ENVS_PATH="$T/no-such-envs" \
+      bash -c "set -e; PS1='\$ '; CLUSTER_NAME=g2; . '$T/environment' >/dev/null 2>&1
+               activate >/dev/null 2>&1; echo REACHED" 2>/dev/null)
+check "caller reaches the next statement" "${out:-<aborted>}" "REACHED"
+
+echo "== 11/12 CONDA_ROOT reaches a child shell =="
+got=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "bash -c 'echo \${CONDA_ROOT:-EMPTY}'")
+check "exported, like CONDA_ENVS_PATH" "$got" "$CONDA"
+
+echo "== 12/12 conda_fast_env_list leaks nothing into the caller =="
+got=$(run "PS1='\$ '; CLUSTER_NAME=g2;" "conda_fast_env_list >/dev/null; echo \${envpath:-unset}")
+check "envpath stays local" "$got" "unset"
+
 
 echo
 echo "passed $PASS, failed $FAIL"
