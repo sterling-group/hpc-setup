@@ -18,6 +18,13 @@
 #   2. Use the `activate` function to manage Conda environments:
 #        activate            # Lists environments (excluding 'base')
 #        activate myenv      # Activates 'myenv' if it exists
+#   3. In a Slurm job script, source this file first -- a batch script is a
+#      non-interactive shell and does not read ~/.bashrc, so `activate` is not
+#      defined until you do:
+#        source /groups/sterling/hpc-setup/scripts/environment
+#        activate myenv
+#      Or skip this file entirely and use conda directly:
+#        source "$CONDA_ROOT/etc/profile.d/conda.sh" && conda activate myenv
 #
 # Author:  Markus G. S. Weiss
 # Date:    2025-09-27
@@ -37,9 +44,10 @@ COLOR_BLUE='\033[1;34m'
 # 2. HPC Cluster Detection
 #    (Sets paths based on the CLUSTER_NAME environment variable)
 ###############################################################################
-if [ -z "${CLUSTER_NAME:-}" ]; then
+# Interactive only, on stderr: stdout here corrupts scp/rsync/sftp streams.
+if [ -z "${CLUSTER_NAME:-}" ] && [ -n "${PS1:-}" ]; then
   printf "%b[WARNING]%b CLUSTER_NAME not set. Some paths may not be configured.\n" \
-    "$COLOR_YELLOW" "$COLOR_RESET"
+    "$COLOR_YELLOW" "$COLOR_RESET" 1>&2
 fi
 
 # Define cluster-specific paths
@@ -48,7 +56,7 @@ JUNO_STERLING_GROUP="/groups/sterling"
 STERLING_GROUP=""
 CONDA_ROOT=""
 
-case "$CLUSTER_NAME" in
+case "${CLUSTER_NAME:-}" in
   g2) 
     STERLING_GROUP="$G2_STERLING_GROUP"
     CONDA_ROOT="$G2_STERLING_GROUP/software-tools/miniconda"
@@ -56,7 +64,14 @@ case "$CLUSTER_NAME" in
   juno)
     STERLING_GROUP="$JUNO_STERLING_GROUP"
     CONDA_ROOT="$JUNO_STERLING_GROUP/software-tools/miniconda"
-    ;;  
+    ;;
+  "")
+    : # already warned above
+    ;;
+  *)
+    [ -n "${PS1:-}" ] && printf "%b[WARNING]%b Unknown CLUSTER_NAME '%s'; HPC paths not configured.\n" \
+      "$COLOR_YELLOW" "$COLOR_RESET" "$CLUSTER_NAME" 1>&2
+    ;;
 esac
 
 ###############################################################################
@@ -72,10 +87,10 @@ if [ -n "$STERLING_GROUP" ] && [ -d "$STERLING_GROUP" ]; then
   fi
 
   # Alias to navigate to HPC home directory, if it exists
-if [ -d "$MFSHOME" ]; then
+  if [ -d "$MFSHOME" ]; then
     alias cdh="cd '$MFSHOME'"
-    # Automatically navigate to HPC home directory on login
-    cd "$MFSHOME" >/dev/null 2>&1
+    # Interactive only: an unconditional cd breaks relative scp/rsync targets.
+    [ -n "${PS1:-}" ] && { cd "$MFSHOME" >/dev/null 2>&1 || :; }
   fi
 
   # Additional HPC-specific aliases
@@ -114,7 +129,7 @@ cl() {
 # Set default conda environments path - directs new environments to HPC home directory
 # Users can override this by exporting CONDA_ENVS_PATH before or after sourcing this script:
 #   export CONDA_ENVS_PATH="/custom/path/to/envs"
-if [ -n "$MFSHOME" ]; then
+if [ -n "${MFSHOME:-}" ]; then
   export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$MFSHOME/envs:$HOME/.conda/envs}"
 else
   export CONDA_ENVS_PATH="${CONDA_ENVS_PATH:-$HOME/.conda/envs}"
@@ -137,7 +152,7 @@ conda_fast_env_list() {
             [[ "$prefix" =~ ^[[:space:]]*# ]] || [ -z "$prefix" ] && continue
             
             # Skip duplicates and invalid environments
-            [ -n "${seen_envs[$prefix]}" ] && continue
+            [ -n "${seen_envs[$prefix]:-}" ] && continue
             [ ! -d "$prefix/conda-meta" ] && continue
             
             seen_envs[$prefix]=1
@@ -163,14 +178,19 @@ conda_fast_env_list() {
     fi
     search_dirs="$search_dirs:$HOME/.conda/envs:$CONDA_ROOT/envs"
     
-    # Split on colons and process each directory
-    local IFS=':'
-    for envdir in $search_dirs; do
+    # Split on ':' without word splitting, which zsh does not do by default.
+    local rest="$search_dirs" envdir
+    while [ -n "$rest" ]; do
+        envdir="${rest%%:*}"
+        case "$rest" in
+            *:*) rest="${rest#*:}" ;;
+            *)   rest="" ;;
+        esac
         [ -z "$envdir" ] || [ ! -d "$envdir" ] && continue
         
         for envpath in "$envdir"/*; do
             [ ! -d "$envpath/conda-meta" ] && continue
-            [ -n "${seen_envs[$envpath]}" ] && continue
+            [ -n "${seen_envs[$envpath]:-}" ] && continue
             
             seen_envs[$envpath]=1
             printf "  %-20s %s\n" "${envpath##*/}" "$envpath"
@@ -223,8 +243,8 @@ activate() {
         return 1
     fi  
 
-    # Activate environment if it exists
-    if conda_fast_env_list | grep -q "^  $env_arg "; then
+    # Activate environment if it exists (-F: names are literals, not patterns)
+    if conda_fast_env_list | grep -qF "  $env_arg "; then
         printf "%bActivating environment:%b %b%s%b\n" \
             "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
         conda activate "$env_arg"
@@ -237,8 +257,8 @@ activate() {
     fi  
 }
 
-# Export functions for use in subshells
-export -f activate
+# `export -f activate` intentionally removed: it exported the function without
+# conda_fast_env_list or CONDA_ROOT, and zsh rejects the -f flag.
 ###############################################################################
 # 6. Final Touches
 #    (Exports PATH and displays a startup message in interactive shells)
