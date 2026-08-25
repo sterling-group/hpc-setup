@@ -188,7 +188,7 @@ Depending on your operating system, follow the appropriate method to copy the pu
 2. **Use the following command to copy your public key to the server. Replace `your_netid` with your actual NetID:**
 
    ```
-   type %USERPROFILE%\.ssh\id_ed25519.pub | ssh your_netid@ganymede2.circ.utdallas.edu "cat >> /home/your_netid/.ssh/authorized_keys"
+   type %USERPROFILE%\.ssh\id_ed25519.pub | ssh your_netid@ganymede2.circ.utdallas.edu "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
    ```
 
 3. **When prompted, enter your NetID password.**
