@@ -49,12 +49,12 @@ seed() {
   touch -d 2020-01-01 "$T/data/notes/thesis.tex"          # far older than retention
 }
 
-echo "== 1/8 exclude is anchored to the root =="
+echo "== 1/9 exclude is anchored to the root =="
 seed; run "$SCRIPT" >/dev/null 2>&1
 check "root envs/ excluded"   "$([ -e "$T/remote/daily/envs" ] && echo y || echo n)" "n"
 check "nested envs/ backed up" "$([ -f "$T/remote/daily/project/data/envs/config.yaml" ] && echo y || echo n)" "y"
 
-echo "== 2/8 a snapshot survives the next prune (content mtime must not matter) =="
+echo "== 2/9 a snapshot survives the next prune (content mtime must not matter) =="
 make_sunday "$T/sunday.sh"
 run "$T/sunday.sh" >/dev/null 2>&1
 before=$(find "$T/remote/archive/$today" -type f | wc -l)
@@ -63,7 +63,7 @@ after=$(find "$T/remote/archive/$today" -type f | wc -l)
 check "snapshot intact after prune" "$after" "$before"
 check "old-mtime file retained" "$([ -f "$T/remote/archive/$today/notes/thesis.tex" ] && echo y || echo n)" "y"
 
-echo "== 3/8 prune keeps the newest N snapshots =="
+echo "== 3/9 prune keeps the newest N snapshots =="
 seed
 # six dated folders, oldest first; only the newest REMOTE_KEEP_SNAPSHOTS survive
 for d in 2026-01-04 2026-01-11 2026-01-18 2026-01-25 2026-02-01 2026-02-08; do
@@ -81,7 +81,7 @@ check "oldest purged"       "$([ -e "$T/remote/archive/2026-01-04" ] && echo y |
 check "purge removes the dir, not just files" "$([ -e "$T/remote/archive/2026-01-11" ] && echo y || echo n)" "n"
 check "non-date entry untouched" "$([ -e "$T/remote/archive/not-a-date" ] && echo y || echo n)" "y"
 
-echo "== 4/8 empty DATA_DIR must not wipe the remote =="
+echo "== 4/9 empty DATA_DIR must not wipe the remote =="
 seed; run "$SCRIPT" >/dev/null 2>&1
 n_before=$(find "$T/remote/daily" -type f | wc -l)
 mkdir -p "$T/empty"
@@ -90,7 +90,7 @@ rc=$?
 check "run failed"      "$([ "$rc" -ne 0 ] && echo y || echo n)" "y"
 check "remote untouched" "$(find "$T/remote/daily" -type f | wc -l)" "$n_before"
 
-echo "== 5/8 mass deletion refused, and not retried through =="
+echo "== 5/9 mass deletion refused, and not retried through =="
 seed; mkdir -p "$T/data/bulk"; for i in $(seq 1 200); do echo x > "$T/data/bulk/f$i.txt"; done
 run "$SCRIPT" >/dev/null 2>&1
 for i in $(seq 1 150); do rm "$T/data/bulk/f$i.txt"; done
@@ -99,11 +99,11 @@ check "exit is rclone's fatal code" "$rc" "7"
 check "stopped at the threshold"    "$(find "$T/remote/daily/bulk" -type f | wc -l)" "100"
 check "no retry of a fatal error"   "$(grep -c 'Retrying in' "$T/logs/backup-$today.log")" "0"
 
-echo "== 6/8 mirrored deletions are recoverable =="
+echo "== 6/9 mirrored deletions are recoverable =="
 check "deleted files land in versions/" \
   "$([ "$(find "$T/remote/versions" -type f 2>/dev/null | wc -l)" -gt 0 ] && echo y || echo n)" "y"
 
-echo "== 7/8 a skipped weekly snapshot is logged =="
+echo "== 7/9 a skipped weekly snapshot is logged =="
 seed; run "$SCRIPT" >/dev/null 2>&1
 if [ "$(date +%u)" = "7" ]; then
   check "snapshot taken on Sunday" "$([ -d "$T/remote/archive/$today" ] && echo y || echo n)" "y"
@@ -111,7 +111,7 @@ else
   check "skip is recorded" "$(grep -c 'no weekly snapshot' "$T/logs/backup-$today.log")" "1"
 fi
 
-echo "== 8/8 the weekly snapshot mirrors a COMPLETED daily sync =="
+echo "== 8/9 the weekly snapshot mirrors a COMPLETED daily sync =="
 seed
 make_sunday "$T/sunday.sh"
 run "$T/sunday.sh" >/dev/null 2>&1
@@ -127,6 +127,29 @@ DATA_DIR="$T/empty" REMOTE_ROOT="$T/remote" RCLONE_BIN="$RCLONE" LOG_DIR="$T/log
   "$T/sunday.sh" >/dev/null 2>&1
 check "failed daily takes no snapshot" \
   "$([ -e "$T/remote/archive/$today" ] && echo y || echo n)" "n"
+
+echo "== 9/9 the snapshot waits for the remote listing, within a bound =="
+# drive the helper directly: sourcing the whole script would take its lock
+awk '/^wait_for_daily_to_settle\(\) \{/,/^\}/' "$SCRIPT" > "$T/settle.sh"
+seed; mkdir -p "$T/remote/daily"
+cp "$T/data/notes/thesis.tex" "$T/remote/daily/"     # remote deliberately short
+# The assignments below are read by the function sourced inside the subshell,
+# which shellcheck cannot follow because that file is generated at runtime.
+# shellcheck disable=SC2034,SC1090,SC1091
+(
+  DATA_DIR="$T/data"; REMOTE_ROOT="$T/remote"; RCLONE_BIN="$RCLONE"
+  RCLONE_OPTS="--fast-list --checksum --log-level WARNING"; SETTLE_MAX_WAIT=4
+  . "$T/settle.sh"
+  start=$(date +%s)
+  wait_for_daily_to_settle "$T/logs/settle.log"; echo "rc=$?" > "$T/settle.rc"
+  echo "el=$(( $(date +%s) - start ))" >> "$T/settle.rc"
+)
+# shellcheck disable=SC1090,SC1091
+. "$T/settle.rc"
+check "gives up on a mismatch"        "$rc" "1"
+check "respects SETTLE_MAX_WAIT"      "$([ "${el:-99}" -le 6 ] && echo y || echo n)" "y"
+check "reports both sides in the log" \
+  "$(grep -c 'source=\|remote=' "$T/logs/settle.log")" "2"
 
 echo
 echo "passed $PASS, failed $FAIL"
