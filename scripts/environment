@@ -77,6 +77,12 @@ case "${CLUSTER_NAME:-}" in
     ;;
 esac
 
+# Export it, as CONDA_ENVS_PATH is exported below. The usage note at the top of
+# this file tells people to fall back on
+#   . "$CONDA_ROOT/etc/profile.d/conda.sh" && conda activate myenv
+# which sourced nothing at all in a child shell while CONDA_ROOT stayed local.
+export CONDA_ROOT
+
 ###############################################################################
 # 3. HPC Environment Setup
 #    (Adds cluster-specific scripts to PATH and defines aliases)
