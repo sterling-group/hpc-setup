@@ -252,8 +252,17 @@ activate() {
         return 1
     fi  
 
-    # Activate environment if it exists (-F: names are literals, not patterns)
-    if conda_fast_env_list | grep -qF "  $env_arg "; then
+    # Activate the environment if it exists.
+    #   $1==n    compare the name column only, and as a literal. `grep -qF` made
+    #            names literal but had to drop the ^ anchor, so a prefix
+    #            containing "  <name> " could match in the path column too.
+    #   ENVIRON  `awk -v` runs escape processing on the assignment ("a\tb" becomes
+    #            a real tab); ENVIRON hands the value over untouched.
+    #   awk      drains stdin, so it cannot SIGPIPE conda_fast_env_list the way
+    #            `grep -q` did -- that killed the producer mid-write and, under
+    #            `set -o pipefail`, turned a real environment into "not found".
+    if conda_fast_env_list |
+       _act_name="$env_arg" awk 'BEGIN{n=ENVIRON["_act_name"]} $1==n{f=1} END{exit !f}'; then
         printf "%bActivating environment:%b %b%s%b\n" \
             "$COLOR_BLUE" "$COLOR_RESET" "$COLOR_GREEN" "$env_arg" "$COLOR_RESET"
         conda activate "$env_arg"
