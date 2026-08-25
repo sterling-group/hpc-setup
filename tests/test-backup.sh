@@ -31,7 +31,7 @@ ok()   { printf '  ok   %s\n' "$1"; PASS=$((PASS+1)); }
 bad()  { printf '  FAIL %s\n' "$1"; FAIL=$((FAIL+1)); }
 check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (want '$3', got '$2')"; fi; }
 
-T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+T=$(mktemp -d); trap 'rm -rf "${T:?}"' EXIT
 
 # A copy of the script that believes it is Sunday, so the weekly path can be tested
 # on any day. The single quotes are deliberate: $(date +%u) is literal pattern text.
@@ -41,7 +41,7 @@ run() { DATA_DIR="$T/data" REMOTE_ROOT="$T/remote" RCLONE_BIN="$RCLONE" LOG_DIR=
 today=$(date +%F)
 
 seed() {
-  rm -rf "$T"/{data,remote,logs}; mkdir -p "$T"/{data,remote,logs}
+  rm -rf "${T:?}"/{data,remote,logs}; mkdir -p "$T"/{data,remote,logs}
   mkdir -p "$T/data/envs/myconda" "$T/data/project/data/envs" "$T/data/notes"
   echo conda    > "$T/data/envs/myconda/pkg.txt"          # root envs -> excluded
   echo precious > "$T/data/project/data/envs/config.yaml" # nested envs -> KEPT

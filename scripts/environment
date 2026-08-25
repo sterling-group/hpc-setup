@@ -54,16 +54,19 @@ fi
 G2_STERLING_GROUP="/groups/sterling"
 JUNO_STERLING_GROUP="/groups/sterling"
 STERLING_GROUP=""
-CONDA_ROOT=""
+# Only a default: a CONDA_ROOT the user exported is kept, matching how
+# CONDA_ENVS_PATH is handled below. Clearing it here used to discard that value,
+# and on an unrecognised cluster left it empty with nothing to put back.
+: "${CONDA_ROOT:=}"
 
 case "${CLUSTER_NAME:-}" in
-  g2) 
+  g2)
     STERLING_GROUP="$G2_STERLING_GROUP"
-    CONDA_ROOT="$G2_STERLING_GROUP/software-tools/miniconda"
-    ;;  
+    : "${CONDA_ROOT:=$G2_STERLING_GROUP/software-tools/miniconda}"
+    ;;
   juno)
     STERLING_GROUP="$JUNO_STERLING_GROUP"
-    CONDA_ROOT="$JUNO_STERLING_GROUP/software-tools/miniconda"
+    : "${CONDA_ROOT:=$JUNO_STERLING_GROUP/software-tools/miniconda}"
     ;;
   "")
     : # already warned above
@@ -200,10 +203,14 @@ conda_fast_env_list() {
 
 # Main activate function for conda environment management
 activate() {
-    # Ensure CONDA_ROOT is set
+    # Ensure CONDA_ROOT is set. Name the actual causes: "check cluster
+    # configuration" sent people to the wrong file.
     if [ -z "$CONDA_ROOT" ]; then
-        printf "%bError:%b CONDA_ROOT not set. Check cluster configuration.\n" \
+        printf "%bError:%b CONDA_ROOT is empty, so conda cannot be located.\n" \
             "$COLOR_RED" "$COLOR_RESET" 1>&2
+        printf "  CLUSTER_NAME is '%s'; a recognised value (g2, juno) sets CONDA_ROOT for you.\n" \
+            "${CLUSTER_NAME:-unset}" 1>&2
+        printf "  Otherwise set it yourself:  export CONDA_ROOT=/path/to/miniconda\n" 1>&2
         return 1
     fi  
 
